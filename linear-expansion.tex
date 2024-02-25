@@ -1,0 +1,97 @@
+\input pdfToolbox
+\input syntax-hi
+\input preamble
+
+\setlayout{horizontal margin=2cm, vertical margin=2cm}
+
+{\setbox0=\hbox{\setfontandscale{bf}{25pt}Linear Expansion}
+\centerline{
+    \vbox{
+        \copy0
+        \smallskip
+        \hbox to\wd0{\hfil Ari Feiglin}
+    }
+}}
+
+\bigskip
+\hbox to\hsize{\hfil\vbox{\hsize=.7\hsize
+\leftskip=0pt plus 1fil \rightskip=\leftskip \parfillskip=\z@
+\hrule
+\kern5pt
+
+In this paper I will define the concept of linear expansion in the context of syntax parsing.
+We will progress through more and more complicated examples, beginning from the programming of a simple calculator until we ultimately have created an extensible programming language.
+
+\kern5pt
+\hrule
+}\hfil}
+
+\section*{Table of Contents}
+
+\tableofcontents
+
+\vfill\break
+
+\section{Theoretical Background}
+
+The idea of linear expansion is simple, given a string $\xi$ the first character looks if it can bind with the second character to produce a new character, and the process repeats itself.
+There is of course, nuance.
+This nuance hides in the statement ``if it can bind'': we must define the rules for binding.
+
+Let us define an {\it expander} to be a tuple $(\Sigma,\beta)$ where $\Sigma$ is an alphabet  and $\beta\colon\Sigma\times\Sigma\longvaruphookrightarrow\Sigma\cup\overline{\bb N}$ is the
+{\it reduction function} where $\overline{\bb N}\coloneqq{\bb N}\cup\set\infty$.
+A {\it program} over an expander is a string over $\Sigma\times\overline{\bb N}$.
+We write a program like $\sigma^1_{i_1}\cdots\sigma^n_{i_n}$ instead of as pairs $(\sigma^1,i_1)\dots(\sigma^n,i_n)$.
+In the character $\sigma_i$, we call $i$ the {\it priority} of $\sigma$.
+
+Then the rules of reduction are as follows, meaning we define $\beta(\xi)$ for a program:
+We do so in cases:
+\benum
+    \item If $\xi=\sigma_i$ then $\beta(\sigma)=\sigma_0$.
+    \item If $\xi=\sigma^1_i\sigma^2_j\xi'$ where $i\geq j$ and $\beta(\sigma^1,\sigma^2)=\sigma^3_k$ is defined then $\beta(\xi)=\sigma^3_k\xi'$.
+    \item Otherwise, $\beta(\xi)=\sigma^1_i\beta(\sigma^2_j\xi')$.
+\eenum
+Notice that $\beta$ cares not about the priorities of its inputs, otherwise it would be a much more complicated function.
+Indeed even currently, its definition is more general than needed, as we will see in the coming examples we can reduce the strength of the expander to something implementable but still useful.
+
+A string $\xi$ such that $\beta(\xi)=\xi$ is called {\it irreducible}.
+Notice that it is possible for a string of length more than $1$ to be irreducible: for example if $\beta(\sigma^1,\sigma^2)$ is not defined then $\sigma^1_i\sigma^2_j$ is irreducible.
+$$ \beta(\sigma_1\tau_2)\xvarrightarrow{(3)}\sigma_1\beta(\tau_2)\xvarrightarrow{(1)}\sigma_1\tau_2 $$
+But such strings are not desired, since in the end we'd like a string to give us a value.
+So an irreducible string which is not a single character is called {\it ill-written}, and a string which is not ill-written is {\it well-written}.
+
+Let us give an example: let $\Sigma={\bb N}\cup\set{+,\cdot,;}\cup\set{(n+),(n\cdot)}[n\in{\bb N}]$.
+$\beta$ as follows:
+
+\medskip
+\centerline{
+    \vtop{\ialign{\hfil$#$\hfil\tabskip=.25cm&\hfil$#$\hfil\cr
+        \sigma^1_i,\sigma^2_j & \beta(\sigma_1,\sigma_2)\cr\noalign{\kern3pt\hrule\kern3pt}
+        n,+ & (n+)_1\cr
+        n,\cdot & (n\cdot)_2\cr
+        (n+),m & n+m\cr
+        (n\cdot),m & n\cdot m\cr
+        (n\cdot),(m+) & (n\cdot m,+)\cr
+        (n+),(m+) & (n+m,+)\cr
+        (n\cdot),(m\cdot) & (n\cdot m,\cdot)\cr
+    }}
+}
+\medskip
+\noindent Where $n,m$ range over all values in ${\bb N}$.
+Here $\beta(\sigma_i,\sigma_j)$'s priority be the minimum between $i$ and $j$.
+
+Now let us look at the string $1+2\cdot3+4;$.
+Here,
+$$ \eqalign{
+    1_\infty+_12_\infty\cdot_23_\infty+_14_\infty &\longto (1+)_12_\infty\cdot_23_\infty+_14_\infty\cr
+    &\longto (1+)_1(2\cdot)_23_\infty+_14_\infty\cr
+    &\longto(1+)_1(2\cdot)_2(3+)_14_\infty\cr
+    &\longto(1+)_1(6+)_14_\infty\cr
+    &\longto(7+)_14_\infty\cr
+    &\longto(7+)_14_0\cr
+    &\longto(11)_0
+} $$
+So the rules for $\beta$ we supplied seem to be sufficient for computing arithmetic expressions following the order of operations.
+
+\bye
+
