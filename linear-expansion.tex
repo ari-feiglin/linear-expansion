@@ -52,7 +52,6 @@ We do so in cases:
     \item Otherwise, $\beta(\xi)=\sigma^1_i\beta(\sigma^2_j\xi')$.
 \eenum
 Notice that $\beta$ cares not about the priorities of its inputs, otherwise it would be a much more complicated function.
-Indeed even currently, its definition is more general than needed, as we will see in the coming examples we can reduce the strength of the expander to something implementable but still useful.
 
 A string $\xi$ such that $\beta(\xi)=\xi$ is called {\it irreducible}.
 Notice that it is possible for a string of length more than $1$ to be irreducible: for example if $\beta(\sigma^1,\sigma^2)$ is not defined then $\sigma^1_i\sigma^2_j$ is irreducible.
@@ -60,15 +59,15 @@ $$ \beta(\sigma_1\tau_2)\xvarrightarrow{(3)}\sigma_1\beta(\tau_2)\xvarrightarrow
 But such strings are not desired, since in the end we'd like a string to give us a value.
 So an irreducible string which is not a single character is called {\it ill-written}, and a string which is not ill-written is {\it well-written}.
 
-Let us give an example: let $\Sigma={\bb N}\cup\set{+,\cdot,;}\cup\set{(n+),(n\cdot)}[n\in{\bb N}]$.
+Let us give an example: let $\Sigma={\bb N}\cup\set{+,\cdot}\cup\set{(n+),(n\cdot)}[n\in{\bb N}]$.
 $\beta$ as follows:
 
 \medskip
 \centerline{
     \vtop{\ialign{\hfil$#$\hfil\tabskip=.25cm&\hfil$#$\hfil\cr
         \sigma^1_i,\sigma^2_j & \beta(\sigma_1,\sigma_2)\cr\noalign{\kern3pt\hrule\kern3pt}
-        n,+ & (n+)_1\cr
-        n,\cdot & (n\cdot)_2\cr
+        n,+ & (n+)\cr
+        n,\cdot & (n\cdot)\cr
         (n+),m & n+m\cr
         (n\cdot),m & n\cdot m\cr
         (n\cdot),(m+) & (n\cdot m,+)\cr
@@ -78,7 +77,7 @@ $\beta$ as follows:
 }
 \medskip
 \noindent Where $n,m$ range over all values in ${\bb N}$.
-Here $\beta(\sigma_i,\sigma_j)$'s priority be the minimum between $i$ and $j$.
+Here $\beta(\sigma_i,\sigma_j)$'s priority is $j$.
 
 Now let us look at the string $1+2\cdot3+4;$.
 Here,
@@ -92,6 +91,48 @@ $$ \eqalign{
     &\longto(11)_0
 } $$
 So the rules for $\beta$ we supplied seem to be sufficient for computing arithmetic expressions following the order of operations.
+
+We can also expand our language to include parentheses.
+So our alphabet becomes $\Sigma={\bb N}\cup\set{+,\cdot,(,)}\cup\set{\bop n+\bcp,\bop n\cdot\bcp,\bop n)\bcp}[n\in{\bb N}]$.
+We distinguish between parentheses and bold parentheses for readability.
+We extend $\beta$ as follows:
+
+\medskip
+\centerline{
+    \vtop{\ialign{\hfil$#$\hfil\tabskip=.25cm&\hfil$#$\hfil\cr
+        \sigma^1_i,\sigma^2_j & \beta(\sigma_1,\sigma_2)\cr\noalign{\kern3pt\hrule\kern3pt}
+        n,+ & \bop n+\bcp_j\cr
+        n,\cdot & \bop n\cdot\bcp_j\cr
+        \bop n+\bcp,m & (n+m)_j\cr
+        \bop n\cdot\bcp,m & (n\cdot m)_j\cr
+        \bop n\cdot\bcp,\bop m+\bcp & \bop n\cdot m,+\bcp_j\cr
+        \bop n+\bcp,\bop m+\bcp & \bop n+m,+\bcp_j\cr
+        \bop n\cdot\bcp,\bop m\cdot\bcp & \bop n\cdot m,\cdot\bcp_j\cr
+        n,) & \bop n)\bcp_j\cr
+        \bop n+\bcp,\bop m)\bcp & \bop n+m)\bcp_j\cr
+        \bop n\cdot\bcp,\bop m)\bcp & \bop n\cdot m)\bcp_j\cr
+        (,\bop n)\bcp & n_i\cr
+    }}
+}
+\medskip
+
+\noindent $(n+m)_j$ means $n+m$ with a priority of $j$, not $\bop n+m\bcp_j$.
+So for example expanding $2\cdot((1+2)\cdot2)+1$,
+$$ \eqalign{
+    2_\infty*_2{(_\infty}{(_\infty}1_\infty+_12_\infty{)_0}*_22_\infty{)_0}+_11_\infty &\longto \bop2*\bcp_2{(_\infty}{(_\infty}1_\infty+_12_\infty{)_0}*_22_\infty{)_0}+_11_\infty\cr
+    &\longto \bop2*\bcp_2{(_\infty}{(_\infty}\bop1+\bcp_12_\infty{)_0}*_22_\infty{)_0}+_11_\infty\cr
+    &\longto \bop2*\bcp_2{(_\infty}{(_\infty}\bop1+\bcp_1\bop2)\bcp_0*_22_\infty{)_0}+_11_\infty\cr
+    &\longto \bop2*\bcp_2{(_\infty}{(_\infty}\bop3)\bcp_0*_22_\infty{)_0}+_11_\infty\cr
+    &\longto \bop2*\bcp_2{(_\infty}3_\infty*_22_\infty{)_0}+_11_\infty\cr
+    &\longto \bop2*\bcp_2{(_\infty}\bop3*\bcp_22_\infty{)_0}+_11_\infty\cr
+    &\longto \bop2*\bcp_2{(_\infty}\bop3*\bcp_2\bop2)\bcp_0+_11_\infty\cr
+    &\longto \bop2*\bcp_2{(_\infty}\bop6)\bcp_0+_11_\infty\cr
+    &\longto \bop2*\bcp_26_\infty+_11_\infty\cr
+    &\longto \bop2*\bcp_2\bop6+\bcp_11_\infty\cr
+    &\longto \bop12+\bcp_11_\infty\cr
+    &\longto \bop12+\bcp_11_0\cr
+    &\longto 13_0\cr
+} $$
 
 \bye
 
