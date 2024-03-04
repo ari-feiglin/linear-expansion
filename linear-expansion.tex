@@ -4,7 +4,7 @@
 
 \setlayout{horizontal margin=2cm, vertical margin=2cm}
 
-{\setbox0=\hbox{\setfontandscale{bf}{25pt}Linear Expansion}
+{\setbox0=\hbox{\setfontandscale{bf}{25pt}Linear Reduction}
 \centerline{
     \vbox{
         \copy0
@@ -19,7 +19,7 @@
 \hrule
 \kern5pt
 
-In this paper I will define the concept of linear expansion in the context of syntax parsing.
+In this paper I will define the concept of linear reduction in the context of syntax parsing.
 We will progress through more and more complicated examples, beginning from the programming of a simple calculator until we ultimately have created an extensible programming language.
 
 \kern5pt
@@ -32,26 +32,39 @@ We will progress through more and more complicated examples, beginning from the 
 
 \vfill\break
 
+\setcounter{section}{-1}
+\section{Notation}
+
+\noindent ${\bb N}$ denotes the set of natural numbers, including $0$.
+
+\smallskip
+\noindent $\overline{\bb N}$ is defined to be ${\bb N}\cup\set\infty$.
+
+\smallskip
+\noindent $f\colon A\plongto B$ means that $f$ is a partial function from $A$ to $B$.
+
+\vfill\break
+
 \section{Theoretical Background}
 
-\subsection{Stateless Expansion}
+\subsection{Stateless Reduction}
 
-The idea of linear expansion is simple: given a string $\xi$ the first character looks if it can bind with the second character to produce a new character, and the process repeats itself.
+The idea of linear reduction is simple: given a string $\xi$ the first character looks if it can bind with the second character to produce a new character, and the process repeats itself.
 There is of course, nuance.
 This nuance hides in the statement ``if it can bind'': we must define the rules for binding.
 
-Let us define an {\it expander} to be a tuple $(\Sigma,\beta)$ where $\Sigma$ is an alphabet and $\beta\colon\overline\Sigma\times\overline\Sigma\plongto\overline\Sigma$ is a partial function called the
-{\it reduction function} where $\overline\Sigma=\Sigma\times\overline{\bb N}$, $\overline{\bb N}\coloneqq{\bb N}\cup\set\infty$.
-A {\it program} over an expander is a string over $\overline\Sigma$.
+Let us define an {\it reducer} to be a tuple $(\Sigma,\beta,\pi)$ where $\Sigma$ is an alphabet; $\beta\colon\overline\Sigma\times\overline\Sigma\plongto\overline\Sigma$ is a partial function called the
+{\it reduction function} where $\overline\Sigma=\Sigma\times\overline{\bb N}$; and $\pi$ is the {\it initial priority function}.
+A {\it program} over an reducer is a string over $\overline\Sigma$.
 We write a program like $\sigma^1_{i_1}\cdots\sigma^n_{i_n}$ instead of as pairs $(\sigma^1,i_1)\dots(\sigma^n,i_n)$.
 In the character $\sigma_i$, we call $i$ the {\it priority} of $\sigma$.
 
 Then the rules of reduction are as follows, meaning we define $\beta(\xi)$ for a program:
 We do so in cases:
 \benum
-    \item If $\xi=\sigma_i$ then $\beta(\sigma)=\sigma_0$.
-    \item If $\xi=\sigma^1_i\sigma^2_j\xi'$ where $i\geq j$ and $\beta(\sigma^1,\sigma^2)=\sigma^3_k$ is defined then $\beta(\xi)=\sigma^3_k\xi'$.
-    \item Otherwise, $\beta(\xi)=\sigma^1_i\beta(\sigma^2_j\xi')$.
+    \item If $\xi=\sigma_i$ then $\beta(\xi)=\sigma_0$.
+    \item If $\xi=\sigma^1_i\sigma^2_j\xi'$ where $i\geq j$ and $\beta(\sigma^1_i,\sigma^2_j)=\sigma^3_k$ is defined then $\beta(\xi)=\sigma^3_k\xi'$.
+    \item Otherwise, for $\xi=\sigma^1_i\sigma^2_j\xi'$, $\beta(\xi)=\sigma^1_i\beta(\sigma^2_j\xi')$.
 \eenum
 
 A string $\xi$ such that $\beta(\xi)=\xi$ is called {\it irreducible}.
@@ -60,6 +73,16 @@ $$ \beta(\sigma_1\tau_2)\xvarrightarrow{(3)}\sigma_1\beta(\tau_2)\xvarrightarrow
 But such strings are not desired, since in the end we'd like a string to give us a value.
 So an irreducible string which is not a single character is called {\it ill-written}, and a string which is not ill-written is {\it well-written}.
 
+Now the initial priority function is $\pi\colon\Sigma\plongto\overline{\bb N}$ which gives characters their initial priority.
+We can then canonically extend this to a function $\pi\colon\Sigma^*\plongto(\Sigma\times\overline{\bb N})^*$ defined by $\pi(\sigma^1\cdots\sigma^n)=\sigma^1_{\pi(\sigma^1)}\cdots\sigma^n_{\pi(\sigma^n)}$.
+Then a $\beta$-reduction of a string $\xi\in\Sigma^*$ is taken to mean a $\beta$-reduction of $\pi(\xi)$.
+
+Notice that once again we require that $\pi$ only be a partial function.
+This is since that we don't always need every character in $\Sigma$ to have an initial priority; some symbols are only given their priority through the $\beta$-reduction of another pair of symbols.
+So we now provide a new definition of a {\it program}, which is a string $\xi=\sigma^1\cdots\sigma^n\in\Sigma^*$ such that $\pi(\sigma^i)$ exists for all $1\leq i\leq n$.
+We can only of course discuss the reductions of programs, as $\pi(\xi)$ is only defined if $\xi$ is a program.
+
+\medskip
 {\bf Example:\/} let $\Sigma={\bb N}\cup\set{+,\cdot}\cup\set{(n+),(n\cdot)}[n\in{\bb N}]$.
 $\beta$ as follows:
 
@@ -79,6 +102,8 @@ $\beta$ as follows:
 \medskip
 \noindent Where $n,m$ range over all values in ${\bb N}$.
 Here $\beta(\sigma_i,\sigma_j)$'s priority is $j$.
+We define the initial priorities
+$$ \pi(n) = \infty,\quad \pi(+) = 1,\quad \pi(\cdot) = 2 $$
 
 Now let us look at the string $1+2\cdot3+4;$.
 Here,
@@ -92,9 +117,10 @@ $$ \eqalign{
     &\longto(11)_0
 } $$
 So the rules for $\beta$ we supplied seem to be sufficient for computing arithmetic expressions following the order of operations.
+\qedd
 
 {\bf Example:\/} We can also expand our language to include parentheses.
-So our alphabet becomes $\Sigma={\bb N}\cup\set{+,\cdot,(,)}\cup\set{\bop n+\bcp,\bop n\cdot\bcp,\bop n)\bcp}[n\in{\bb N}]$.
+So our alphabet becomes $\Sigma={\bb N}\cup\set{+,\cdot,(,)}\cup\set{\uline{ n+},\uline{ n\cdot},\uline{ n)}}[n\in{\bb N}]$.
 We distinguish between parentheses and bold parentheses for readability.
 We extend $\beta$ as follows:
 
@@ -102,63 +128,79 @@ We extend $\beta$ as follows:
 \centerline{
     \vtop{\ialign{\hfil$#$\hfil\tabskip=.25cm&\hfil$#$\hfil\cr
         \sigma^1_i,\sigma^2_j & \beta(\sigma^1_i,\sigma^2_j)\cr\noalign{\kern3pt\hrule\kern3pt}
-        n,+ & \bop n+\bcp_j\cr
-        n,\cdot & \bop n\cdot\bcp_j\cr
-        \bop n+\bcp,m & (n+m)_j\cr
-        \bop n\cdot\bcp,m & (n\cdot m)_j\cr
-        \bop n\cdot\bcp,\bop m+\bcp & \bop n\cdot m,+\bcp_j\cr
-        \bop n+\bcp,\bop m+\bcp & \bop n+m,+\bcp_j\cr
-        \bop n\cdot\bcp,\bop m\cdot\bcp & \bop n\cdot m,\cdot\bcp_j\cr
-        n,) & \bop n)\bcp_j\cr
-        \bop n+\bcp,\bop m)\bcp & \bop n+m)\bcp_j\cr
-        \bop n\cdot\bcp,\bop m)\bcp & \bop n\cdot m)\bcp_j\cr
-        (,\bop n)\bcp & n_i\cr
+        n,+ & \uline{ n+}_j\cr
+        n,\cdot & \uline{ n\cdot}_j\cr
+        \uline{ n+},m & (n+m)_j\cr
+        \uline{ n\cdot},m & (n\cdot m)_j\cr
+        \uline{ n\cdot},\uline{ m+} & \uline{ n\cdot m,+}_j\cr
+        \uline{ n+},\uline{ m+} & \uline{ n+m,+}_j\cr
+        \uline{ n\cdot},\uline{ m\cdot} & \uline{ n\cdot m,\cdot}_j\cr
+        n,) & \uline{ n)}_j\cr
+        \uline{ n+},\uline{ m)} & \uline{ n+m)}_j\cr
+        \uline{ n\cdot},\uline{ m)} & \uline{ n\cdot m)}_j\cr
+        (,\uline{ n)} & n_i\cr
     }}
 }
 \medskip
 
-\noindent $(n+m)_j$ means $n+m$ with a priority of $j$, not $\bop n+m\bcp_j$.
-So for example expanding $2\cdot((1+2)\cdot2)+1$,
+\noindent $(n+m)_j$ means $n+m$ with a priority of $j$, not $\uline{ n+m}_j$.
+And we define the initial priorities
+$$ \pi(n) = \infty,\quad \pi(+) = 1,\quad \pi(\cdot) = 2,\quad \pi({(}) = \infty,\quad \pi({)}) = 0 $$
+So for example reducing $2\cdot((1+2)\cdot2)+1$,
 $$ \eqalign{
-    2_\infty*_2{(_\infty}{(_\infty}1_\infty+_12_\infty{)_0}*_22_\infty{)_0}+_11_\infty &\longto \bop2*\bcp_2{(_\infty}{(_\infty}1_\infty+_12_\infty{)_0}*_22_\infty{)_0}+_11_\infty\cr
-    &\longto \bop2*\bcp_2{(_\infty}{(_\infty}\bop1+\bcp_12_\infty{)_0}*_22_\infty{)_0}+_11_\infty\cr
-    &\longto \bop2*\bcp_2{(_\infty}{(_\infty}\bop1+\bcp_1\bop2)\bcp_0*_22_\infty{)_0}+_11_\infty\cr
-    &\longto \bop2*\bcp_2{(_\infty}{(_\infty}\bop3)\bcp_0*_22_\infty{)_0}+_11_\infty\cr
-    &\longto \bop2*\bcp_2{(_\infty}3_\infty*_22_\infty{)_0}+_11_\infty\cr
-    &\longto \bop2*\bcp_2{(_\infty}\bop3*\bcp_22_\infty{)_0}+_11_\infty\cr
-    &\longto \bop2*\bcp_2{(_\infty}\bop3*\bcp_2\bop2)\bcp_0+_11_\infty\cr
-    &\longto \bop2*\bcp_2{(_\infty}\bop6)\bcp_0+_11_\infty\cr
-    &\longto \bop2*\bcp_26_\infty+_11_\infty\cr
-    &\longto \bop2*\bcp_2\bop6+\bcp_11_\infty\cr
-    &\longto \bop12+\bcp_11_\infty\cr
-    &\longto \bop12+\bcp_11_0\cr
+    2_\infty*_2{(_\infty}{(_\infty}1_\infty+_12_\infty{)_0}*_22_\infty{)_0}+_11_\infty &\longto \uline{2*}_2{(_\infty}{(_\infty}1_\infty+_12_\infty{)_0}*_22_\infty{)_0}+_11_\infty\cr
+    &\longto \uline{2*}_2{(_\infty}{(_\infty}\uline{1+}_12_\infty{)_0}*_22_\infty{)_0}+_11_\infty\cr
+    &\longto \uline{2*}_2{(_\infty}{(_\infty}\uline{1+}_1\uline{2)}_0*_22_\infty{)_0}+_11_\infty\cr
+    &\longto \uline{2*}_2{(_\infty}{(_\infty}\uline{3)}_0*_22_\infty{)_0}+_11_\infty\cr
+    &\longto \uline{2*}_2{(_\infty}3_\infty*_22_\infty{)_0}+_11_\infty\cr
+    &\longto \uline{2*}_2{(_\infty}\uline{3*}_22_\infty{)_0}+_11_\infty\cr
+    &\longto \uline{2*}_2{(_\infty}\uline{3*}_2\uline{2)}_0+_11_\infty\cr
+    &\longto \uline{2*}_2{(_\infty}\uline{6)}_0+_11_\infty\cr
+    &\longto \uline{2*}_26_\infty+_11_\infty\cr
+    &\longto \uline{2*}_2\uline{6+}_11_\infty\cr
+    &\longto \uline{12+}_11_\infty\cr
+    &\longto \uline{12+}_11_0\cr
     &\longto 13_0\cr
 } $$
+\qedd
 
-Notice that in both examples, the characters in the string were given an initial priority.
-Thus we can extend our definition of an expander to include an {\it initial priority} function $\pi\colon\Sigma\plongto\overline{\bb N}$ which gives characters their initial priority.
-We can then canonically extend this to a function $\pi\colon\Sigma^*\plongto(\Sigma\times\overline{\bb N})^*$ defined by $\pi(\sigma^1\cdots\sigma^n)=\sigma^1_{\pi(\sigma^1)}\cdots\sigma^n_{\pi(\sigma^n)}$.
-Then a $\beta$-reduction of a string $\xi\in\Sigma^*$ is taken to mean a $\beta$-reduction of $\pi(\xi)$.
+\subsection{Stateful Reduction}
 
-Notice that once again we require that $\pi$ only be a partial function.
-This is since that we don't always need every character in $\Sigma$ to have an initial priority; in the above examples there's no need to give $\bop n+\bcp$ an inital priority, its priority is given through the $\beta$-reduction of $n$ and $+$.
-So we now provide a new definition of a {\it program}, which is a string $\xi=\sigma^1\cdots\sigma^n\in\Sigma^*$ such that $\pi(\sigma^i)$ exists for all $1\leq i\leq n$.
-We can only of course discuss the reductions of programs, as $\pi(\xi)$ is only defined if $\xi$ is a program.
-
-\subsection{Stated Expansion}
-
-Suppose we'd like to expand a program with variables in it.
-Then we cannot just use the previous definitions, as the actions of $\sigma$ (which is to be understood as the function $\beta(\sigma,\bullet)$) are determined before any expansion occurs.
+Suppose we'd like to reduce a program with variables in it.
+Then we cannot just use the previous definitions, as the actions of $\sigma$ (which is to be understood as the function $\beta(\sigma,\bullet)$) are determined before any reduction occurs.
 We need a way to store the value of variables, a state.
 
 This leads us to the following definition: let $\Sigma_P$ and $\Sigma_A$ be two disjoint sets of symbols: $\Sigma_P$ the set of {\it printable symbols} and $\Sigma_A$ the set of {\it abstract symbols}.
 $\Sigma_P$ will generally be a set consisting of the string representations of abstract symbols, be it operators like $+$ and $\cdot$ or variable names.
 $\Sigma_A$ are the actual objects which can ``execute something''.
-Let us further define $\Sigma=\Sigma_P\dcup\Sigma_P$ and let $\State=\set{\Sigma_P\longto\Sigma_A\dcup\set\epsilon}$ be the set of all functions from printable to abstract symbols.
-We allow printable symbols to be mapped to $\epsilon$, the empty word; this should be thought of the symbol having no value.
+Let us further define $\Sigma=\Sigma_P\cup\Sigma_A$.
+
+Now a state is a mapping from printable symbols to strings.
+So for example, if $x$ is a printable symbol a line like $\lett x=1$ should change the state so that $x$ maps to the abstract symbol representing $1$.
+So we can view a state as a map from $\Sigma_P\longto\Sigma^*$, where if the map of a symbol is $\epsilon$ (the empty word), this represents it not having a value.
+But in order to implement locality, we must be able to revert to a previous state.
+Thus a state will actually be a (non-empty) sequence of maps $\Sigma_P\longto\Sigma^*$.
+Maps $\Sigma_P\longto\Sigma^*$ are called {\it point states}.
+A {\it substitution} is a partial map $\nu\colon\Sigma_P\plongto\Sigma^*$ which represents changing the values in its domain to their new values in the substitution.
+For a point-state $\hat s$ define $\hat s\nu$ by $\hat s\nu(\sigma)=\nu(\sigma)$ if $\sigma$ is in $\nu$'s domain and $\hat s(\sigma)$ otherwise.
+Substitutions are often written as $[\sigma_1\mapsto v_1,\dots,\sigma_n\mapsto v_n]$ which is to be understood as the partial function which maps $\sigma_i$ to $v_i$.
+
+Let us define
+$$ \State = \set{\Sigma_P\longto\Sigma^*}^+ $$
+the set of all finite non-empty sequences of maps.
+
+Let $ s= s_1\cdots s_n\in\State$ be a state, then define
+\blist
+    \item for $\sigma\in\Sigma_P$ we define $ s(\sigma)= s_n(\sigma)$,
+    \item define $\pop s= s_1\cdots s_{n-1}$ (if $n>1$),
+    \item define $\push s= s_1\cdots s_n s_n$,
+    \item if $\nu$ is a substitution, define $s\nu$ to be $s_1\cdots s_{n-1}(s_n\nu)$.
+\elist
+\noindent So if we'd like to revert to a previous state, we simply pop from the current state.
+And substituting the current state only alters the current (topmost) point state.
 
 Now we begin with an initial $\beta$ function which is a partial function
-$$ \beta\colon\overline\Sigma_A\times\overline\Sigma\times\State \plongto \bigl(\overline\Sigma\dcup\set\epsilon\bigr)\times\State $$
+$$ \beta\colon\overline\Sigma_A\times\overline\Sigma\times\State \plongto \overline\Sigma^*\times\State $$
 Recall that $\overline\Sigma$ is $\Sigma\times{\bb N}$.
 We will denote tuples in $X\times\State$ by $\gen{x,s}$ for $x\in X$ and $s\in\State$ for the sake of readability.
 So we now wish to extend to a $\beta$ function
@@ -166,18 +208,18 @@ $$ \beta\colon\overline\Sigma^*\times\State \plongto \overline\Sigma^*\times\Sta
 We do this as follows: given $\xi\in(\Sigma\times\overline{\bb N})^*$ and $s\in\State$ we define $\beta\gen{\xi,s}$ as follows:
 \benum
     \item if $\xi=\sigma_i\xi'$ for $\sigma\in\Sigma_P$ then $\beta\gen{\xi,s}=\gen{s(\sigma)_i\xi',s}$,
-    \item if $\xi=\sigma^1_i\sigma^2_j\xi'$ for $\sigma^1\in\Sigma_A$, $i\geq j$, such that $\beta\gen{\sigma^1_i\sigma^2_j,s}=\gen{\sigma^3_k,s'}$ is defined, then
-        $\beta\gen{\xi,s}=\gen{\sigma^3_k\xi',s'}$,
-    \item otherwise if $\beta\gen{\sigma^2_j\xi',s}=\gen{\xi'',s'}$ then $\beta\gen{\xi,s}=\gen{\sigma^1_i\xi'',s'}$.
+    \item if $\xi=\sigma^1_i\sigma^2_j\xi'$ for $\sigma^1\in\Sigma_A$, $i\geq j$, such that $\beta\gen{\sigma^1_i\sigma^2_j,s}=\gen{\xi'',s'}$ is defined, then
+        $\beta\gen{\xi,s}=\gen{\xi''\xi',s'}$,
+    \item otherwise for $\xi=\sigma^1_i\sigma^2_j\xi'$, if $\beta\gen{\sigma^2_j\xi',s}=\gen{\xi'',s'}$ then $\beta\gen{\xi,s}=\gen{\sigma^1_i\xi'',s'}$.
 \eenum
 We also define the {\it initial priority function} to be a map $\pi\colon\Sigma_P\longto\overline{\bb N}$ (this is not a partial function: every printable symbol must be given a priority).
 This is once again canonically extended to a function $\pi\colon\Sigma_P^*\longto(\Sigma_P\times\overline{\bb N})^*$.
-And an {\it initial state} $s_0\in\State$.
-The quintuple $(\Sigma_P,\Sigma_A,\beta,\pi,s_0)$ is called an {\it expander}.
-The expansion of a string $\xi\in S$ is the process of iteratively applying $\beta$ to $\gen{\pi(\xi),s_0}$.
+And an {\it initial state} $s_0$ which is a point state.
+The quintuple $(\Sigma_P,\Sigma_A,\beta,\pi,s_0)$ is called an {\it reducer}.
+The reduction of a string $\xi\in S$ is the process of iteratively applying $\beta$ to $\gen{\pi(\xi),s_0}$.
 
 \medskip
-{\bf Example:\/} So for example let
+{\bf Example:\/} let
 $$ \eqalign{
     \Sigma_P &= {\bb N}\cup\set{+,\cdot,=,;}\cup\set{{\tt let}}\cup\set{x^i}[i\in{\bb N}],\cr
     \Sigma_A &= {\bb N}\cup\set{(n+),(n\cdot)}[n\in{\bb N}]\cup\set{{\tt let}}\cup\set{({\tt let}x^i),({\tt let}x^i=)}[i\in{\bb N}]
@@ -194,15 +236,15 @@ We further add the transitions
 \medskip
 \centerline{
     \vtop{\ialign{\hfil$#$\hfil\tabskip=.5cm&\hfil$#$\hfil\cr
-        \gen{\sigma^1\sigma^2,s} & \beta\gen{\sigma^1\sigma^2,s}\cr\noalign{\kern3pt\hrule\kern3pt}
-        \gen{\sigma;,s} & \gen{\sigma_0,s}\cr
-        \gen{\lett x^i,s} & \gen{(\lett x^i)_\infty,s}\cr
-        \gen{(\lett x^i)=,s} & \gen{(\lett x^i=)_0,s}\cr
-        \gen{(\lett x^i=)n,s} & \gen{\epsilon,s[x^i\mapsto s(n)]}\cr
+        \gen{\sigma^1_i\sigma^2_j,s} & \beta\gen{\sigma^1\sigma^2,s}\cr\noalign{\kern3pt\hrule\kern3pt}
+        \gen{\sigma;,s} & \gen{\sigma_j,s}\cr
+        \gen{\lett x^i,s} & \gen{(\lett x^i)_j,s}\cr
+        \gen{(\lett x^i)=,s} & \gen{(\lett x^i=)_j,s}\cr
+        \gen{(\lett x^i=)\sigma,s} & \gen{\epsilon,s[x^i\mapsto\sigma]}\cr
 }}}
 
 \noindent In the final transition, $n\in\Sigma_A$.
-Then for example (we will be skipping trivial expansions):
+Then for example (we will be skipping trivial reductions):
 $$ \eqalign{
     \lett x^1=1+2;\ \lett x^2=2;\ x^1\cdot x^2; &\longto
     {\tt let}_\infty x^1_\infty=_01_\infty+_12_\infty;_0\ {\tt let}_\infty x^2_\infty =_0 2_\infty;_0\ x^1_\infty\cdot_2 x^2_\infty;_0\cr
@@ -215,6 +257,26 @@ $$ \eqalign{
     s_0[x^1\mapsto3,\,x^2\mapsto2]\quad&\longto (3\cdot)_2 2_\infty;_0\cr
     s_0[x^1\mapsto3,\,x^2\mapsto2]\quad&\longto 6_0\cr
 } $$
+\qedd
+
+\medskip
+
+{\bf Example:\/} Why does the initial $\beta$ function map to strings $\overline\Sigma^*\times\State$ and not $\Sigma\times\State$?
+This is in order to implement functions; let us analyze the following example:
+$$ \eqalign{
+    \Sigma_P &= {\bb N}\cup\set{+,\cdot,=,(,),\{,\},\comm,;,{\tt let},{\tt fun}}\cup\set{x^i}[i\in{\bb N}]\cr
+    \Sigma_A &= \Sigma_P^*
+} $$
+We will denote strings in $\Sigma_A$ with an underline to distinguish them from elements of $\Sigma_P$.
+This is an extension of the previous examples, so the initial $\beta$ function acts the same on these characters, all we must do is add what happens to ${\tt fun}$ and the other characters we added.
+
+\medskip
+\centerline{
+    \vtop{\ialign{\hfil$#$\hfil\tabskip=.5cm&\hfil$#$\hfil\cr
+        \gen{\sigma^1_i\sigma^2_j,s} & \beta\gen{\sigma^1\sigma^2,s}\cr\noalign{\kern3pt\hrule\kern3pt}
+        \gen{\{_i\sigma_j,s} & \gen{\sigma_j,\push s}\cr
+        \gen{\
+}}}
 
 \bye
 
