@@ -82,8 +82,7 @@ This is since that we don't always need every character in $\Sigma$ to have an i
 So we now provide a new definition of a {\it program}, which is a string $\xi=\sigma^1\cdots\sigma^n\in\Sigma^*$ such that $\pi(\sigma^i)$ exists for all $1\leq i\leq n$.
 We can only of course discuss the reductions of programs, as $\pi(\xi)$ is only defined if $\xi$ is a program.
 
-\medskip
-{\bf Example:\/} let $\Sigma={\bb N}\cup\set{+,\cdot}\cup\set{(n+),(n\cdot)}[n\in{\bb N}]$.
+\Example let $\Sigma={\bb N}\cup\set{+,\cdot}\cup\set{(n+),(n\cdot)}[n\in{\bb N}]$.
 $\beta$ as follows:
 
 \medskip
@@ -119,7 +118,7 @@ $$ \eqalign{
 So the rules for $\beta$ we supplied seem to be sufficient for computing arithmetic expressions following the order of operations.
 \qedd
 
-{\bf Example:\/} We can also expand our language to include parentheses.
+\Example We can also expand our language to include parentheses.
 So our alphabet becomes $\Sigma={\bb N}\cup\set{+,\cdot,(,)}\cup\set{\uline{ n+},\uline{ n\cdot},\uline{ n)}}[n\in{\bb N}]$.
 We distinguish between parentheses and bold parentheses for readability.
 We extend $\beta$ as follows:
@@ -189,7 +188,7 @@ Let us define
 $$ \State = \set{\Sigma_P\longto\Sigma^*}^+ $$
 the set of all finite non-empty sequences of maps.
 
-Let $ s= s_1\cdots s_n\in\State$ be a state, then define
+Let $s= s_1\cdots s_n\in\State$ be a state, then define
 \blist
     \item for $\sigma\in\Sigma_P$ we define $ s(\sigma)= s_n(\sigma)$,
     \item define $\pop s= s_1\cdots s_{n-1}$ (if $n>1$),
@@ -200,7 +199,7 @@ Let $ s= s_1\cdots s_n\in\State$ be a state, then define
 And substituting the current state only alters the current (topmost) point state.
 
 Now we begin with an initial $\beta$ function which is a partial function
-$$ \beta\colon\overline\Sigma_A\times\overline\Sigma\times\State \plongto \overline\Sigma^*\times\State $$
+$$ \beta\colon\overline\Sigma_A\times(\overline\Sigma\cup\set\epsilon)\times\State \plongto \overline\Sigma^*\times\State $$
 Recall that $\overline\Sigma$ is $\Sigma\times{\bb N}$.
 We will denote tuples in $X\times\State$ by $\gen{x,s}$ for $x\in X$ and $s\in\State$ for the sake of readability.
 So we now wish to extend to a $\beta$ function
@@ -208,18 +207,20 @@ $$ \beta\colon\overline\Sigma^*\times\State \plongto \overline\Sigma^*\times\Sta
 We do this as follows: given $\xi\in(\Sigma\times\overline{\bb N})^*$ and $s\in\State$ we define $\beta\gen{\xi,s}$ as follows:
 \benum
     \item if $\xi=\sigma_i\xi'$ for $\sigma\in\Sigma_P$ then $\beta\gen{\xi,s}=\gen{s(\sigma)_i\xi',s}$,
+    \item if $\xi=\sigma_i\xi'$ such that $\beta\gen{\sigma_i\epsilon,s}=\gen{\xi'',s'}$ is defined then $\beta\gen{\xi,s}=\gen{\xi''\xi',s'}$,
     \item if $\xi=\sigma^1_i\sigma^2_j\xi'$ for $\sigma^1\in\Sigma_A$, $i\geq j$, such that $\beta\gen{\sigma^1_i\sigma^2_j,s}=\gen{\xi'',s'}$ is defined, then
         $\beta\gen{\xi,s}=\gen{\xi''\xi',s'}$,
     \item otherwise for $\xi=\sigma^1_i\sigma^2_j\xi'$, if $\beta\gen{\sigma^2_j\xi',s}=\gen{\xi'',s'}$ then $\beta\gen{\xi,s}=\gen{\sigma^1_i\xi'',s'}$.
 \eenum
+\noindent Notice that $\bf(2)$ cares not about the priority of $\sigma$, and neither if $\beta(\sigma_i,\tau_j)$ is defined for some $\tau\neq\epsilon$.
+
 We also define the {\it initial priority function} to be a map $\pi\colon\Sigma_P\longto\overline{\bb N}$ (this is not a partial function: every printable symbol must be given a priority).
 This is once again canonically extended to a function $\pi\colon\Sigma_P^*\longto(\Sigma_P\times\overline{\bb N})^*$.
 And an {\it initial state} $s_0$ which is a point state.
 The quintuple $(\Sigma_P,\Sigma_A,\beta,\pi,s_0)$ is called an {\it reducer}.
 The reduction of a string $\xi\in S$ is the process of iteratively applying $\beta$ to $\gen{\pi(\xi),s_0}$.
 
-\medskip
-{\bf Example:\/} let
+\Example let
 $$ \eqalign{
     \Sigma_P &= {\bb N}\cup\set{+,\cdot,=,;}\cup\set{{\tt let}}\cup\set{x^i}[i\in{\bb N}],\cr
     \Sigma_A &= {\bb N}\cup\set{(n+),(n\cdot)}[n\in{\bb N}]\cup\set{{\tt let}}\cup\set{({\tt let}x^i),({\tt let}x^i=)}[i\in{\bb N}]
@@ -259,23 +260,32 @@ $$ \eqalign{
 } $$
 \qedd
 
-\medskip
-
-{\bf Example:\/} Why does the initial $\beta$ function map to strings $\overline\Sigma^*\times\State$ and not $\Sigma\times\State$?
+\Example Why does the initial $\beta$ function map to strings $\overline\Sigma^*\times\State$ and not $\Sigma\times\State$?
 This is in order to implement functions; let us analyze the following example:
 $$ \eqalign{
     \Sigma_P &= {\bb N}\cup\set{+,\cdot,=,(,),\{,\},\comm,;,{\tt let},{\tt fun}}\cup\set{x^i}[i\in{\bb N}]\cr
-    \Sigma_A &= \Sigma_P^*
+    \Sigma_A &= \underline\Sigma_P^*\cup\set{\uline\{',\uline\}'}
 } $$
-We will denote strings in $\Sigma_A$ with an underline to distinguish them from elements of $\Sigma_P$.
+We will denote strings in $\Sigma_A$ with an underline to distinguish them from elements of $\Sigma_P$ (hence the $\underline\Sigma_P^*$ in $\Sigma_A$).
 This is an extension of the previous examples, so the initial $\beta$ function acts the same on these characters, all we must do is add what happens to ${\tt fun}$ and the other characters we added.
+
+The reason that we add the symbols $\uline\{'$ and $\uline\}'$ even though $\uline\{$ and $\uline\}$ exist already in $\underline\Sigma_P$ is because curly braces have two different yet related behaviors.
+The first is to begin and end scopes: $\{\dots\}$ will start a new scope, then execute $\dots$, then end the scope.
+The second is in code of the form ${\tt fun}(\dots)\{\dots\}$, where we would like $\{\dots\}$ to accumulate all the code in $\dots$.
 
 \medskip
 \centerline{
     \vtop{\ialign{\hfil$#$\hfil\tabskip=.5cm&\hfil$#$\hfil\cr
         \gen{\sigma^1_i\sigma^2_j,s} & \beta\gen{\sigma^1\sigma^2,s}\cr\noalign{\kern3pt\hrule\kern3pt}
-        \gen{\{_i\sigma_j,s} & \gen{\sigma_j,\push s}\cr
-        \gen{\
+        \gen{\uline{\tt fun}_i(_j,s} & \gen{\uline{{\tt fun}(}_j,s[\{\mapsto\uline\{',\,\}\mapsto\uline\}']}\cr
+        \gen{\uline{{\tt fun}\xi}_i\sigma_j,s} & \gen{\uline{{\tt fun}\xi\sigma}_j,s}\rlap{\qquad if $\xi$ doesn't end with $)$}\cr
+        \gen{\uline{{\tt fun}\xi}_i\;\uline{\{\xi\}},s} & \gen{\uline{{\tt fun}\xi\{\xi'\}},s}\cr
+        \gen{\uline{{\tt fun}(x_1,\dots,x_n)\{\xi\}}_i\;\uline{(v_1,\dots,v_n)}_j,s} & \gen{\pi(\xi\cc),(\push s)[x_1\mapsto v_1,\dots,x_n\mapsto v_n]}\cr
+        \gen{\uline\{_i\epsilon,s} & \gen{\epsilon,\push s}\cr
+        \gen{\uline\}_i\epsilon,s} & \gen{\epsilon,\pop s}\cr
+        \gen{\uline{\oc'\xi}_i\sigma_j,s} & \gen{\uline{\oc'\xi\sigma}_i,s}\rlap{\qquad for $\sigma\in\Sigma_P$ not $\oc$}\cr
+        \gen{\uline{\oc'\xi}_i\;\uline{\oc\xi'\cc}_j,s} & \gen{\uline{\oc'\xi\oc\xi'\cc}_i,s}\cr
+        \gen{\uline{\oc'\xi}_i\;\uline{\cc'},s} & \gen{\uline{\oc\xi\cc},s}\cr
 }}}
 
 \bye

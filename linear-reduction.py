@@ -45,9 +45,11 @@ class Atom:
 priorities = {
             '+' : ExtNum(1),
             '*' : ExtNum(2),
+            '/' : ExtNum(2),
             '**' : ExtNum(3),
             ';' : ExtNum(0),
-            '=': ExtNum(0)
+            '=' : ExtNum(0),
+            ',' : ExtNum(0),
         }
 
 def create_variable(name, value):
@@ -56,6 +58,7 @@ def create_variable(name, value):
 operations = {
             '+' : lambda a,b: a.val + b.val,
             '*' : lambda a,b: a.val * b.val,
+            '/' : lambda a,b: a.val / b.val,
             '**' : lambda a,b: a.val ** b.val,
             '=' : create_variable,
         }
@@ -68,9 +71,12 @@ macros = {
             'sqrt' : lambda a: Atom(math.sqrt(a.val), a.priority, 'v', a.val_fun, 'sqrt' + a.str_rep),
             'let' : lambda a: Atom(a.val, a.priority, 'u', a.val_fun, 'let' + a.str_rep),
             'print' : print_val,
+            'pow' : lambda a: Atom(math.pow(a.val[0], a.val[1]), a.priority, 'v', a.val_fun, 'pow' + a.str_rep),
+            'sum' : lambda a: Atom(sum(a.val), a.priority, 'v', a.val_fun, 'sum' + a.str_rep),
         }
 
 applications = {
+    ('v','v') : lambda a,b: Atom(a.val * b.val, b.priority, 'v', b.val_fun, a.str_rep + b.str_rep),
     ('v','o') : lambda a,b: Atom(a.val, b.priority, 'o', b.val_fun, a.str_rep + b.str_rep),
     ('o','v') : lambda a,b: Atom(a.val_fun(a, b), b.priority, 'v', b.val_fun, a.str_rep + b.str_rep),
     ('o','o') : lambda a,b: Atom(a.val_fun(a, b), b.priority, 'o', b.val_fun, a.str_rep + b.str_rep),
@@ -85,6 +91,9 @@ applications = {
     ('u','o') : lambda a,b: Atom(a.val, b.priority, 'o', b.val_fun, a.str_rep + b.str_rep),
     ('v',';') : lambda a,b: Atom(a.val, b.priority, 'v', a.val_fun, a.str_rep + b.str_rep),
     ('s',';') : lambda a,b: Atom(a.val, b.priority, 's', a.val_fun, a.str_rep + b.str_rep),
+    (',',',') : lambda a,b: Atom(a.val + b.val, b.priority, ',', a.val_fun, a.str_rep + b.str_rep),
+    ('v',',') : lambda a,b: Atom([a.val], b.priority, ',', a.val_fun, a.str_rep + b.str_rep),
+    (',',')') : lambda a,b: Atom(a.val + [b.val], b.priority, ')', a.val_fun, a.str_rep + b.str_rep),
 }
 
 atom_types = {
@@ -94,6 +103,7 @@ atom_types = {
             'o' : lambda o: Atom(o, priorities[o], 'o', operations[o]),
             's' : lambda s: Atom(s, ExtNum(0,1), 's', lambda: Exception("string type cannot compute value")),
             ';' : lambda s: Atom(';', ExtNum(0), ';', lambda: Exception("end type cannot compute value")),
+            ',' : lambda s: Atom(',', ExtNum(0), ',', lambda: Exception("list constructor type cannot compute value")),
         }
 
 independent_atypes = ['(', ')']
@@ -103,7 +113,8 @@ atypes = {
             ';' : [';'],
             '(' : ['('],
             ')' : [')'],
-            '.' : ['o', 'v']
+            '.' : ['o', 'v'],
+            ',' : [',', 'o']
         }
 
 for c in ['~', '!', '@', '#', '$', '%', '^', '&', '*', '-', '+', '=', '/', '|', '<', '>']:
@@ -162,7 +173,7 @@ def reduce_atoms(atoms):
 def full_reduce(atoms):
     last_atoms = atoms
     while atoms != None:
-        #print_atoms_list(atoms)
+        print_atoms_list(atoms)
         last_atoms = atoms
         atoms = reduce_atoms(atoms)
     return last_atoms[0].val
