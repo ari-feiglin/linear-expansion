@@ -1,0 +1,66 @@
+\input pdfToolbox
+\input preamble
+
+\centerline{\setfontandscale{bf}{20pt}Final Project}
+\centerline{\setfontandscale{bf}{15pt}Computer Science, Bar Ilan University}
+\smallskip
+\centerline{\it Noam Kaplinski and Ari Feiglin}
+
+\section{Introduction}
+
+Our idea is to create a programming language utilizing a (novel?) algorithm we have developed.
+The algorithm allows for parsing and lexing to be done at runtime on an on-demand basis: tokens are only read and expressions evaluated when they are needed, as opposed to an
+entire line being read, lexed, then parsed into an AST (abstract syntax tree).
+
+Instead, the program is parsed in a linear-esque fashion, similar to macro languages like \TeX.
+Similar to \TeX, the language will expose internal functionalities to the programmer, allowing them to alter the behavior of the lexer and reducer (parser).
+
+The language will be a dynamically typed multi-paradigm language, with syntax similar to that of JavaScript.
+Meaning it will support both procedural and object-oriented programming.
+The language will also allow for metaprogramming: the programming of the language itself (its lexer and parser), by directives which alter how the language interprets symbols,
+expansion, etc.
+
+\section{The Structure of the Project}
+
+The project will have two main components: a theoretical part, and a practical part.
+The theoretical part will be a paper describing the algorithm and the implementation of the practical part, which will be an interpreter for a language we will create.
+
+TODOs for the theoretical part:
+\benum
+    \item Finalize how the algorithm works.
+    This means potentially altering the definition of a $\beta$-reducer to allow for OOP.
+    Another issue is that of scoped variables (alter the definition of a state) and closure.
+    \item Come up with a specification for the language.
+    \item Come up with an initial $\beta$-reducer and priority function for the specification.
+    \item Write a coherent paper explaining the goals of the language and algorithm, as well as how it was implemented.
+\eenum
+
+TODOs for the practical part:
+\benum
+    \item First, I think it may be a good idea to write a prototype in an easy language like Python.
+    \item Implement the initial $\beta$-reducer as well as the extension rules for $\beta$-reducers.
+    \item Implement a lexer (all it needs to do is read the next token and convert it to a token and priority; I have a decent algorithm for this already).
+    \item Implement a final interpreter in C++.
+\eenum
+
+These two components are inextricable, so we will have to work on both simultaneously probably.
+For example, while writing the specification we should understand how the initial $\beta$-reducer should function on it, and perhaps implement it in Python to verify that it
+works.
+
+\section{Steps}
+
+Some steps we maybe should follow:
+\benum
+    \item Get together, explain the algorithm in depth.
+    Explain what problems I'm working on currently, potential solutions.
+    \item Work on finishing up the algorithm, do so by extending the specification and initial $\beta$-reducer for the program.
+    This will probably be the hardest step.
+    \item Document the algorithm, specification, and initial $\beta$-reducer in the paper.
+    \item Implement a Python version of an interpreter.
+    \item Document the implementation in the paper.
+    \item Translate from Python to C++.
+    \item Write a standard library for the language?
+\eenum
+
+\bye
+
