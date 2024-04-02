@@ -1,5 +1,4 @@
 \input pdfToolbox
-\input syntax-hi
 \input preamble
 
 \setlayout{horizontal margin=2cm, vertical margin=2cm}
@@ -9,7 +8,7 @@
     \vbox{
         \copy0
         \smallskip
-        %\hbox to\wd0{\hfil Ari Feiglin}
+        \hbox to\wd0{\hfil Ari Feiglin and Noam Kaplinski}
     }
 }}
 
@@ -19,7 +18,7 @@
 \hrule
 \kern5pt
 
-In this paper I will define the concept of linear reduction in the context of syntax parsing.
+In this paper we will define the concept of linear reduction in the context of syntax parsing.
 We will progress through more and more complicated examples, beginning from the programming of a simple calculator until we ultimately have created an extensible programming language.
 
 \kern5pt
@@ -42,6 +41,9 @@ We will progress through more and more complicated examples, beginning from the 
 
 \smallskip
 \noindent $f\colon A\plongto B$ means that $f$ is a partial function from $A$ to $B$.
+
+\smallskip
+\noindent If ${\sf X}$ is a set and ${\sf x}$ is some symbol, then ${\sf X}_{\sf x}={\sf X}^{\sf x}={\sf X}\cup\set{{\sf x}}$.
 
 \vfill\break
 
@@ -176,24 +178,22 @@ Let us further define $\Sigma=\Sigma_P\cup\Sigma_A$.
 
 Now a state is a mapping from printable symbols to strings.
 So for example, if $x$ is a printable symbol a line like $\lett x=1$ should change the state so that $x$ maps to the abstract symbol representing $1$.
-So we can view a state as a map from $\Sigma_P\longto\Sigma^*$, where if the map of a symbol is $\epsilon$ (the empty word), this represents it not having a value.
-But in order to implement locality, we must be able to revert to a previous state.
-Thus a state will actually be a (non-empty) sequence of maps $\Sigma_P\longto\Sigma^*$.
-Maps $\Sigma_P\longto\Sigma^*$ are called {\it point states}.
-A {\it substitution} is a partial map $\nu\colon\Sigma_P\plongto\Sigma^*$ which represents changing the values in its domain to their new values in the substitution.
-For a point-state $\hat s$ define $\hat s\nu$ by $\hat s\nu(\sigma)=\nu(\sigma)$ if $\sigma$ is in $\nu$'s domain and $\hat s(\sigma)$ otherwise.
-Substitutions are often written as $[\sigma_1\mapsto v_1,\dots,\sigma_n\mapsto v_n]$ which is to be understood as the partial function which maps $\sigma_i$ to $v_i$.
 
+A {\it point state} is a partial function $s\colon\Sigma_P\plongto\Sigma_A$.
+If $s_1,s_2$ are point states, define their composition to be a point state $s_1s_2$ such that
+$$ s_1s_2(\sigma) = \cases{s_2(\sigma) & $\sigma\in{\rm dom}(s_2)$\cr s_1(\sigma) & $\sigma\in{\rm dom}(s_1)$} $$
+A {\it state} is a sequence of point states: $\overline s=(s_1,\dots,s_n)$.
 Let us define
-$$ \State = \set{\Sigma_P\longto\Sigma^*}^+ $$
-the set of all finite non-empty sequences of maps.
+$$ \State = \set{\Sigma_P\plongto\Sigma_A}^+ $$
+the set of all states.
 
-Let $s= s_1\cdots s_n\in\State$ be a state, then define
+Let $\overline s=(s_1\cdots s_n)\in\State$ be a state, then define
 \blist
-    \item for $\sigma\in\Sigma_P$ we define $ s(\sigma)= s_n(\sigma)$,
-    \item define $\pop s= s_1\cdots s_{n-1}$ (if $n>1$),
-    \item define $\push s= s_1\cdots s_n s_n$,
-    \item if $\nu$ is a substitution, define $s\nu$ to be $s_1\cdots s_{n-1}(s_n\nu)$.
+    \item for $\sigma\in\Sigma_P$ we define $ s(\sigma)=s_1\cdots s_n(\sigma)$ (the composition of states),
+    \item define $\pop\overline s=(s_1,\dots,s_{n-1})$,
+    \item define $\push\overline s=(s_1,\dots,s_n,\varnothing)$ ($\varnothing$ is the empty state),
+    \item if $s$ is a point state, $\overline ss=(s_1,\dots,s_{n-1},s_ns)$,
+    \item if $s$ is a point state, $\overline s+s=(s_1,\dots,s_n,s)$ (so $\push\overline s=\overline s+\varnothing$).
 \elist
 \noindent So if we'd like to revert to a previous state, we simply pop from the current state.
 And substituting the current state only alters the current (topmost) point state.
@@ -201,16 +201,16 @@ And substituting the current state only alters the current (topmost) point state
 Now we begin with an initial $\beta$ function which is a partial function
 $$ \beta\colon\overline\Sigma_A\times(\overline\Sigma\cup\set\epsilon)\times\State \plongto \overline\Sigma^*\times\State $$
 Recall that $\overline\Sigma$ is $\Sigma\times{\bb N}$.
-We will denote tuples in $X\times\State$ by $\gen{x,s}$ for $x\in X$ and $s\in\State$ for the sake of readability.
+We will denote tuples in $X\times\State$ by $\gen{x,}[s]$ for $x\in X$ and $s\in\State$ for the sake of readability.
 So we now wish to extend to a $\beta$ function
 $$ \beta\colon\overline\Sigma^*\times\State \plongto \overline\Sigma^*\times\State $$
-We do this as follows: given $\xi\in(\Sigma\times\overline{\bb N})^*$ and $s\in\State$ we define $\beta\gen{\xi,s}$ as follows:
+We do this as follows: given $\xi\in(\Sigma\times\overline{\bb N})^*$ and $s\in\State$ we define $\beta\gen{\xi}[s]$ as follows:
 \benum
-    \item if $\xi=\sigma_i\xi'$ for $\sigma\in\Sigma_P$ then $\beta\gen{\xi,s}=\gen{s(\sigma)_i\xi',s}$,
-    \item if $\xi=\sigma_i\xi'$ such that $\beta\gen{\sigma_i\epsilon,s}=\gen{\xi'',s'}$ is defined then $\beta\gen{\xi,s}=\gen{\xi''\xi',s'}$,
-    \item if $\xi=\sigma^1_i\sigma^2_j\xi'$ for $\sigma^1\in\Sigma_A$, $i\geq j$, such that $\beta\gen{\sigma^1_i\sigma^2_j,s}=\gen{\xi'',s'}$ is defined, then
-        $\beta\gen{\xi,s}=\gen{\xi''\xi',s'}$,
-    \item otherwise for $\xi=\sigma^1_i\sigma^2_j\xi'$, if $\beta\gen{\sigma^2_j\xi',s}=\gen{\xi'',s'}$ then $\beta\gen{\xi,s}=\gen{\sigma^1_i\xi'',s'}$.
+    \item if $\xi=\sigma_i\xi'$ for $\sigma\in\Sigma_P$ then $\beta\gen{\xi}[s]=\gen{s(\sigma)_i\xi'}[s]$,
+    \item if $\xi=\sigma_i\xi'$ such that $\beta\gen{\sigma_i\epsilon}[s]=\gen{\xi''}[s']$ is defined then $\beta\gen{\xi}[s]=\gen{\xi''\xi'}[s']$,
+    \item if $\xi=\sigma^1_i\sigma^2_j\xi'$ for $\sigma^1\in\Sigma_A$, $i\geq j$, such that $\beta\gen{\sigma^1_i\sigma^2_j}[s]=\gen{\xi''}[s']$ is defined, then
+        $\beta\gen{\xi}[s]=\gen{\xi''\xi'}[s']$,
+    \item otherwise for $\xi=\sigma^1_i\sigma^2_j\xi'$, if $\beta\gen{\sigma^2_j\xi'}[s]=\gen{\xi''}[s']$ then $\beta\gen{\xi}[s]=\gen{\sigma^1_i\xi''}[s']$.
 \eenum
 \noindent Notice that $\bf(2)$ cares not about the priority of $\sigma$, and neither if $\beta(\sigma_i,\tau_j)$ is defined for some $\tau\neq\epsilon$.
 
@@ -218,7 +218,7 @@ We also define the {\it initial priority function} to be a map $\pi\colon\Sigma_
 This is once again canonically extended to a function $\pi\colon\Sigma_P^*\longto(\Sigma_P\times\overline{\bb N})^*$.
 And an {\it initial state} $s_0$ which is a point state.
 The quintuple $(\Sigma_P,\Sigma_A,\beta,\pi,s_0)$ is called an {\it reducer}.
-The reduction of a string $\xi\in S$ is the process of iteratively applying $\beta$ to $\gen{\pi(\xi),s_0}$.
+The reduction of a string $\xi\in S$ is the process of iteratively applying $\beta$ to $\gen{\pi(\xi)}[s_0]$.
 
 \Example let
 $$ \eqalign{
@@ -237,11 +237,11 @@ We further add the transitions
 \medskip
 \centerline{
     \vtop{\ialign{\hfil$#$\hfil\tabskip=.5cm&\hfil$#$\hfil\cr
-        \gen{\sigma^1_i\sigma^2_j,s} & \beta\gen{\sigma^1\sigma^2,s}\cr\noalign{\kern3pt\hrule\kern3pt}
-        \gen{\sigma;,s} & \gen{\sigma_j,s}\cr
-        \gen{\lett x^i,s} & \gen{(\lett x^i)_j,s}\cr
-        \gen{(\lett x^i)=,s} & \gen{(\lett x^i=)_j,s}\cr
-        \gen{(\lett x^i=)\sigma,s} & \gen{\epsilon,s[x^i\mapsto\sigma]}\cr
+        \gen{\sigma^1_i\sigma^2_j}[s] & \beta\gen{\sigma^1\sigma^2}[s]\cr\noalign{\kern3pt\hrule\kern3pt}
+        \gen{\sigma;}[s] & \gen{\sigma_j}[s]\cr
+        \gen{\lett x^i}[s] & \gen{(\lett x^i)_j}[s]\cr
+        \gen{(\lett x^i)=}[s] & \gen{(\lett x^i=)_j}[s]\cr
+        \gen{(\lett x^i=)\sigma}[s] & \gen{\epsilon}[{s[x^i\mapsto\sigma]}]\cr
 }}}
 
 \noindent In the final transition, $n\in\Sigma_A$.
@@ -260,33 +260,47 @@ $$ \eqalign{
 } $$
 \qedd
 
-\Example Why does the initial $\beta$ function map to strings $\overline\Sigma^*\times\State$ and not $\Sigma\times\State$?
-This is in order to implement functions; let us analyze the following example:
-$$ \eqalign{
-    \Sigma_P &= {\bb N}\cup\set{+,\cdot,=,(,),\{,\},\comm,;,{\tt let},{\tt fun}}\cup\set{x^i}[i\in{\bb N}]\cr
-    \Sigma_A &= \underline\Sigma_P^*\cup\set{\uline\{',\uline\}'}
-} $$
-We will denote strings in $\Sigma_A$ with an underline to distinguish them from elements of $\Sigma_P$ (hence the $\underline\Sigma_P^*$ in $\Sigma_A$).
-This is an extension of the previous examples, so the initial $\beta$ function acts the same on these characters, all we must do is add what happens to ${\tt fun}$ and the other characters we added.
+\subsection{Valued Reduction}
 
-The reason that we add the symbols $\uline\{'$ and $\uline\}'$ even though $\uline\{$ and $\uline\}$ exist already in $\underline\Sigma_P$ is because curly braces have two different yet related behaviors.
-The first is to begin and end scopes: $\{\dots\}$ will start a new scope, then execute $\dots$, then end the scope.
-The second is in code of the form ${\tt fun}(\dots)\{\dots\}$, where we would like $\{\dots\}$ to accumulate all the code in $\dots$.
+Notice that in the previous examples, many symbols had values, be it a number, a list, etc.
+This leads us to the next variation of linear reduction: {\it valued} linear reduction.
+Here we start with the sets: ${\cal U}$ the universe of values, $\Sigma_P$ the set of printable types, and $\Sigma_A$ the set of abstract types.
 
-\medskip
-\centerline{
-    \vtop{\ialign{\hfil$#$\hfil\tabskip=.5cm&\hfil$#$\hfil\cr
-        \gen{\sigma^1_i\sigma^2_j,s} & \beta\gen{\sigma^1\sigma^2,s}\cr\noalign{\kern3pt\hrule\kern3pt}
-        \gen{\uline{\tt fun}_i(_j,s} & \gen{\uline{{\tt fun}(}_j,s[\{\mapsto\uline\{',\,\}\mapsto\uline\}']}\cr
-        \gen{\uline{{\tt fun}\xi}_i\sigma_j,s} & \gen{\uline{{\tt fun}\xi\sigma}_j,s}\rlap{\qquad if $\xi$ doesn't end with $)$}\cr
-        \gen{\uline{{\tt fun}\xi}_i\;\uline{\{\xi\}},s} & \gen{\uline{{\tt fun}\xi\{\xi'\}},s}\cr
-        \gen{\uline{{\tt fun}(x_1,\dots,x_n)\{\xi\}}_i\;\uline{(v_1,\dots,v_n)}_j,s} & \gen{\pi(\xi\cc),(\push s)[x_1\mapsto v_1,\dots,x_n\mapsto v_n]}\cr
-        \gen{\uline\{_i\epsilon,s} & \gen{\epsilon,\push s}\cr
-        \gen{\uline\}_i\epsilon,s} & \gen{\epsilon,\pop s}\cr
-        \gen{\uline{\oc'\xi}_i\sigma_j,s} & \gen{\uline{\oc'\xi\sigma}_i,s}\rlap{\qquad for $\sigma\in\Sigma_P$ not $\oc$}\cr
-        \gen{\uline{\oc'\xi}_i\;\uline{\oc\xi'\cc}_j,s} & \gen{\uline{\oc'\xi\oc\xi'\cc}_i,s}\cr
-        \gen{\uline{\oc'\xi}_i\;\uline{\cc'},s} & \gen{\uline{\oc\xi\cc},s}\cr
-}}}
+Here ${\cal U}$ is some arbitrary set, it will contain of all possible values (numbers, lists, strings, functions, etc.) in our program.
+$\Sigma_P$ and $\Sigma_A$ are sets of symbols which we call {\it types}.
+
+Let us further define $\Pi_A\coloneqq\Sigma_A\times\U$ to be the set of {\it abstract values}, $\Sigma\coloneqq\Sigma_P\cup\Sigma_A$ the set of types, and $\Pi=\Sigma_P\cup\Pi_A$ the set of {\it values}
+(printable types are also values).
+
+Let us define a point-state, similar to stateful reductions, but now the state of a printable type can also be a sequence of printable types.
+This is so we can define functions: we can allow a symbol to expand to the code of a function.
+So a point-state is a partial function $\Sigma_P\plongto(\Sigma_A\cup\Sigma_P^*)$, and a state is a sequence of point-states.
+Define ${\rm State}$ to be the set of states.
+$\push,\pop$,etc. is defined as before.
+
+Now we define a {\it initial $\beta$-reducer} to be
+$$ \hat\beta\colon\overline\Sigma_A\times\overline\Sigma_\epsilon\times{\rm State}\plongto\overline\Sigma^*\times(\U\times\U_\varnothing\plongto\U_\varnothing^*)\times{\rm State} $$
+The idea is that given two types, you create a new sequence of types, a value function $f$, and a new state.
+If the values of the original two types are $v,u$ then the values of the new sequence of types will be $f(v,u)$.
+Here we consider the value of a printable type to be $\varnothing$.
+
+For readability, an element of $\overline\Pi$ will be written as $\sigma_n(v)$ for a type of $\sigma$, a priority of $n$, and a value of $v$ ($v=\varnothing$ if $\sigma\in\Sigma_P$).
+And for $\xi=\sigma^1_{n_1}\cdots\sigma^k_{n_k}\in\overline\Sigma^*$ and $\vec v=v_1\cdots v_k\in\U_\varnothing^*$, define $\xi(\vec v)$ to be $\sigma^1_{n_1}(v_1)\cdots\sigma^k_{n_k}(v_k)$.
+
+A {\it $\beta$-reducer} is a partial function
+$$ \beta\colon\overline\Pi^*\times{\rm State}\plongto\overline\Pi^*\times{\rm State} $$
+The $\beta$-reducer {\it derived} from an initial $\beta$-reducer $\hat\beta$ is defined recursively as follows: for $\gen{\xi}[s]\in\overline\Pi^*\times{\rm State}$,
+
+\benum
+    \item If $\xi=\sigma_n\xi'$ where $\sigma\in\Sigma_P$ is a printable symbol, then:
+        \benum
+            \item if $s(\sigma)=\tau\in\Sigma_A$ then $\gen{\tau_n\xi'}[s]$,
+            \item otherwise, $s(\sigma)=\xi''$ then $\gen{\pi(\xi'')\xi'}[s]$.
+        \eenum
+    \item If $\xi=\sigma_n(v)\xi'$ where $\hat\beta(\sigma,\epsilon,s)=(\xi'',f,s')$ then $\gen{\xi''(f(v))\xi'}[s]$.
+    \item If $\xi=\sigma_n(v)\tau_m(u)\xi'$ where $n\geq m$ and $\hat\beta(\sigma,\tau,s)=(\xi'',f,s')$ then $\gen{\xi''(f(v))\xi'}[s]$.
+    \item Otherwise $\xi=\sigma_n(v)\tau_m(u)\xi'$ and $n<m$ or $\hat\beta(\sigma,\tau,s)$ is undefined, then if $\beta\gen{\tau_m(u)\xi'}[s]=\gen{\xi'',s'}$, then $\gen{\sigma_n(v)\xi''}[s']$.
+\eenum
 
 \bye
 
