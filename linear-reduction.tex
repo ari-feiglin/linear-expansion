@@ -271,36 +271,129 @@ $\Sigma_P$ and $\Sigma_A$ are sets of symbols which we call {\it types}.
 
 Let us further define $\Pi_A\coloneqq\Sigma_A\times\U$ to be the set of {\it abstract values}, $\Sigma\coloneqq\Sigma_P\cup\Sigma_A$ the set of types, and $\Pi=\Sigma_P\cup\Pi_A$ the set of {\it values}
 (printable types are also values).
+Elements of $\overline\Pi$ will be written like $\sigma_n(v)$ where $\sigma$ is the type, $n$ the priority, and $v$ the value (nothing for printable types).
 
-Let us define a point-state, similar to stateful reductions, but now the state of a printable type can also be a sequence of printable types.
-This is so we can define functions: we can allow a symbol to expand to the code of a function.
-So a point-state is a partial function $\Sigma_P\plongto(\Sigma_A\cup\Sigma_P^*)$, and a state is a sequence of point-states.
-Define ${\rm State}$ to be the set of states.
-$\push,\pop$,etc. is defined as before.
+Let us define a point-state, similar to stateful reductions, as partial functions from $\Sigma_P$ to $\Pi_A$.
+Then a state is defined as a sequence of point-states similar to before.
 
-Now we define a {\it initial $\beta$-reducer} to be
-$$ \hat\beta\colon\overline\Sigma_A\times\overline\Sigma_\epsilon\times{\rm State}\plongto\overline\Sigma^*\times(\U\times\U_\varnothing\plongto\U_\varnothing^*)\times{\rm State} $$
-The idea is that given two types, you create a new sequence of types, a value function $f$, and a new state.
-If the values of the original two types are $v,u$ then the values of the new sequence of types will be $f(v,u)$.
-Here we consider the value of a printable type to be $\varnothing$.
+In valued reduction, we abstract away some inputs to the initial beta-reducer in order to allow for easier implementation.
+An initial beta-reducer is a partial function
+$$ \hat\beta\colon \Sigma_A\times\Sigma_\epsilon\times{\rm State}\plongto\Sigma_A^\epsilon\times(\overline{\bb N}\times\overline{\bb N}\to\overline{\bb N})\times
+({\cal U}\times{\cal U}\pto{\cal U}\times\Sigma_P^*\times{\rm State}) $$
 
-For readability, an element of $\overline\Pi$ will be written as $\sigma_n(v)$ for a type of $\sigma$, a priority of $n$, and a value of $v$ ($v=\varnothing$ if $\sigma\in\Sigma_P$).
-And for $\xi=\sigma^1_{n_1}\cdots\sigma^k_{n_k}\in\overline\Sigma^*$ and $\vec v=v_1\cdots v_k\in\U_\varnothing^*$, define $\xi(\vec v)$ to be $\sigma^1_{n_1}(v_1)\cdots\sigma^k_{n_k}(v_k)$.
-
-A {\it $\beta$-reducer} is a partial function
+We extend this to a derived $\beta$-reducer,
 $$ \beta\colon\overline\Pi^*\times{\rm State}\plongto\overline\Pi^*\times{\rm State} $$
-The $\beta$-reducer {\it derived} from an initial $\beta$-reducer $\hat\beta$ is defined recursively as follows: for $\gen{\xi}[s]\in\overline\Pi^*\times{\rm State}$,
-
+with the following rules: given an input $\gen{\xi}[s]$ its image is
 \benum
-    \item If $\xi=\sigma_n\xi'$ where $\sigma\in\Sigma_P$ is a printable symbol, then:
-        \benum
-            \item if $s(\sigma)=\tau\in\Sigma_A$ then $\gen{\tau_n\xi'}[s]$,
-            \item otherwise, $s(\sigma)=\xi''$ then $\gen{\pi(\xi'')\xi'}[s]$.
-        \eenum
-    \item If $\xi=\sigma_n(v)\xi'$ where $\hat\beta(\sigma,\epsilon,s)=(\xi'',f,s')$ then $\gen{\xi''(f(v))\xi'}[s]$.
-    \item If $\xi=\sigma_n(v)\tau_m(u)\xi'$ where $n\geq m$ and $\hat\beta(\sigma,\tau,s)=(\xi'',f,s')$ then $\gen{\xi''(f(v))\xi'}[s]$.
-    \item Otherwise $\xi=\sigma_n(v)\tau_m(u)\xi'$ and $n<m$ or $\hat\beta(\sigma,\tau,s)$ is undefined, then if $\beta\gen{\tau_m(u)\xi'}[s]=\gen{\xi'',s'}$, then $\gen{\sigma_n(v)\xi''}[s']$.
+    \item If $\xi=\sigma_n\xi'$ for $\sigma\in\Sigma_p$ then
+        $$ \beta\gen{\xi}[s] = \gen{s(\sigma)_n\xi'}[s] . $$
+    \item If $\xi=\sigma_i(v)\xi'$ and $\hat\beta(\sigma,\epsilon,s)=(\alpha,\rho,f)$ is defined, then if $f(v)=(w,\omega,s')$ and $\rho(i)=k$ then
+        $$ \beta\gen{\xi}[s] = \gen{\alpha_k(w)\pi(\omega)\xi'}[s'] . $$
+    \item If $\xi=\sigma_i(v)\tau_j(u)\xi'$ and $i\geq j$ and $\hat\beta(\sigma,\tau,s)=(\alpha,\rho,f)$ is defined, then if $f(v,u)=(w,\omega,s')$ and $\rho(i,j)=k$ then
+        $$ \beta\gen{\xi}[s] = \gen{\alpha_k(w)\pi(\omega)\xi'}[s] . $$
+    \item Otherwise, if $\xi=\sigma_i(v)\xi'$ and $\beta\gen{\xi'}[s]=\gen{\xi''}[s']$,
+        $$ \beta\gen{\xi}[s] = \gen{\sigma_i(v)\xi''}[s'] . $$
 \eenum
+
+\subsubsection{States}
+
+Similar to before, we define point-states as partial maps $\Sigma_P\plongto\Pi_A$.
+And if $s_1,s_2$ are two point-states and $\sigma\in\Sigma_P$ then
+$$ s_1s_2(\sigma) = \cases{s_2(\sigma) & $\sigma\in{\rm dom}s_2$\cr s_1(\sigma) & $\sigma\in{\rm dom}s_1$} $$
+We will denote finite point states as $[\sigma_1\mapsto\varkappa_1,\dots,\sigma_n\mapsto\varkappa_n]$, and this denotes the point-state which maps $\sigma_i$ to $\varkappa_i$.
+Then we define a state to be a sequence of point-states.
+For a state $\bar s=(s_1,\dots,s_n)$, let us define
+\benum
+    \item $\bar s+s=(s_1,\dots,s_n,s)$
+    \item $\pop\bar s=(s_1,\dots,s_{n-1})$
+    \item $\bar ss=(s_1,\dots,s_ns)$
+    \item $\bar s(\sigma)=s_1\cdots s_n(\sigma)$ for $\sigma\in\Sigma_P$
+\eenum
+Furthermore, if $\sigma\in\Sigma_P$ and $\varkappa\in\Pi_A$ let us define $\bar s\{\sigma\mapsto\varkappa\}$ as $(s_1,\dots,s_i[\sigma\mapsto\varkappa],\dots,s_n)$ where $i$ is the maximum index such that
+$\sigma\in{\rm dom}s_i$.
+
+\subsubsection{The Initial Beta Reducer}
+
+We will now construct the initial $\beta$-reducer for our programming language.
+By convention, {\astyle abstract types} will be colored red.
+
+\noindent{\bf End:}
+We add an abstract type $\eend$ with the initial reduction rule
+$$ {\astyle\sigma}\ \eend\ s \longto \sigma\ {\sf zero}\ (u\to u) $$
+where ${\sf zero}$ is the constant zero map.
+
+\noindent{\bf Arithmetic:}
+We add two abstract types $\op$ and $\value$ with initial reduction rules:
+\blist
+    \item $\value\ \op\ s \longto \op\ \snd\ \bigl(v,f\to(v,f),\epsilon,s\bigr)$
+    \item $\op\ \op\ s\longto \op\ \snd\ \bigl((v,f),(u,g)\to(f(v,u),g),\epsilon,s\bigr)$
+    \item $\op\ \value\ s\longto \value\ \snd\ \bigl((v,f),u\longto f(v,u),\epsilon,s\bigr)$
+\elist
+Where $\fst,\snd$ are the first and second projection maps respectively.
+Notice that here things of the form $(n,f)$ etc. are {\it values} (which are just arbitrary, and different from \value s).
+These abstract types we have just defined allow for basic arithmetic:
+$$ \eqalign{
+    \value_\infty(1) \op_1(+) \value_\infty(2) \op_2(\cdot) \value_\infty(3)\eend_0 &\longto \op_1(1,+)\value_\infty(2)\op_2(\cdot)\value_\infty(3)\eend_0\cr
+    &\longto \op_1(1,+)\op_2(2,\cdot)\value_\infty(3)\eend_0\cr
+    &\longto \op_1(1,+)\op_2(2,\cdot)\value_0(3)\cr
+    &\longto \op_1(1,+)\value_0(6)\cr
+    &\longto \value_0(7)
+} $$
+Other than numbers, $\value$ can also be strings and lists.
+
+We further define $\lparen$ and $\rparen$, as well as $\vrparen$ (value rparen) as follows:
+\blist
+    \item $\value\ \rparen\ s\longto \vrparen\ \snd\ \bigl(n\to n,\epsilon,s\bigr)$
+    \item $\op\ \vrparen\ s\longto \vrparen\ \snd\ \bigl((f,n),m\to f(n,m),\epsilon,s\bigr)$
+    \item $\lparen\ \vrparen\ s\longto \value\ \fst\ \bigl(n\to n,\epsilon,s\bigr)$
+\elist
+
+\noindent{\bf Lists:}
+We add $\lbrack$, $\rbrack$, and $\list$.
+\blist
+    \item $\lbrack\ {\astyle\sigma}\ s\longto \lbrack\ \snd\ \bigl(\ell,u\to(\ell,u),\epsilon,s\bigr)$ for ${\astyle\sigma}\neq\lbrack,\rbrack$
+    \item $\lbrack\ \rbrack\ s\longto \list\ {\sf infty}\ \bigl(\ell\to\ell,\epsilon,s\bigr)$
+\elist
+So for example $[1+2;2;]$ will be converted to (really this is misleading, since the printable tokens aren't converted into abstract tokens before parsing, but rather during it.
+The following example is just to give some intuition)
+\lmultlines{
+    \lbrack_0 \value_\infty(1) \op_1(+) \value_\infty(2)\eend_0 \value_\infty(2)\eend_0 \rbrack_0\cr
+    &\longto \lbrack_0 \op_1(1,+) \value_\infty(2)\eend_0 \value_\infty(2)\eend_0\rbrack_0\cr
+    &\longto \lbrack_0\op_1(1,+)\value_0(2)\value_\infty(2)\eend_0\rbrack_0\cr
+    &\longto \lbrack_0\value_0(3)\value_\infty(2)\eend_0\rbrack_0\cr
+    &\longto \lbrack_0(3)\value_\infty(2)\eend_0\rbrack_0\cr
+    &\longto \lbrack_0(3)\value_0(2)\rbrack_0\cr
+    &\longto \lbrack_0(3,2)\rbrack_0\cr
+    &\longto \list_\infty(3,2)\cr
+}
+
+\noindent{\bf Variables:}
+We add $\lett$, $\leteq$, $\sett$, $\seteq$, and $\equal$,
+\blist
+    \item $\lett\ x\ s\longto \lett\ \snd\ \bigl(\to x,\epsilon,s\bigr)$
+    \item $\lett\ \equal\ s\longto \leteq\ \snd\ \bigl(x\to x,\epsilon,s\bigr)$
+    \item $\leteq\ {\astyle\sigma}\ s\longto \epsilon\ \fst\ \bigl(x,v\to \epsilon,\epsilon,s[x\mapsto\sigma(v)]\bigr)$
+    \item $\sett\ x\ s\longto \sett\ \snd\ \bigl(\to x,\epsilon,s\bigr)$
+    \item $\sett\ \equal\ s\longto \seteq\ \snd\ \bigl(x\to x,\epsilon,s\bigr)$
+    \item $\seteq\ {\astyle\sigma}\ s\longto \epsilon\ \fst\ \bigl(x,v\to \epsilon,\epsilon,s\{x\mapsto\sigma(v)\}\bigr)$
+\elist
+For example
+$$ \eqalign{
+    \lett_\infty x_\infty \equal_0 \value_\infty(2)\eend_0 & \longto \lett_\infty(x) \equal_0 \value_\infty(2)\eend_0\cr
+    &\longto \leteq_0(x) \value_\infty(2)\eend_0\cr
+    &\longto \leteq_0(x) \value_0(2)\cr
+    &\longto \epsilon\cr
+} $$
+and the state will have changed to $s[x\mapsto2]$.
+
+\noindent{\bf Scoping:}
+We add $\lbrace$ and $\rbrace$:
+\blist
+    \item $\lbrace\ \epsilon\ s\longto \epsilon\ \fst\ \bigl(\to \epsilon,\epsilon,s+\varnothing\bigr)$
+    \item $\rbrace\ \epsilon\ s\longto \epsilon\ \fst\ \bigl(\to \epsilon,\epsilon,\pop s\bigr)$
+\elist
+This highlights the difference between $\lett$ and $\sett$: $\lett$ creates a new variable in the current scope, and $\sett$ alters an existing variable in the scope for which it is defined.
+This is like doing {\tt int x = 0} vs {\tt x = 0} in C.
 
 \bye
 
