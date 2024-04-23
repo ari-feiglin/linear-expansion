@@ -323,49 +323,57 @@ $$ {\astyle\sigma}\ \eend\ s \longto \sigma\ {\sf zero}\ (u\to u) $$
 where ${\sf zero}$ is the constant zero map.
 
 \noindent{\bf Arithmetic:}
-We add two abstract types $\op$ and $\value$ with initial reduction rules:
+For each abstract type $\asig$ we define the ``compound'' abstract type $\asig\op$ with rules:
 \blist
-    \item $\value\ \op\ s \longto \op\ \snd\ \bigl(v,f\to(v,f),\epsilon,s\bigr)$
-    \item $\op\ \op\ s\longto \op\ \snd\ \bigl((v,f),(u,g)\to(f(v,u),g),\epsilon,s\bigr)$
-    \item $\op\ \value\ s\longto \value\ \snd\ \bigl((v,f),u\longto f(v,u),\epsilon,s\bigr)$
+    \item $\asig\ \op\ s \longto \asig\op\ \snd\ \bigl(v,f\to(v,f),\epsilon,s\bigr)$
+    \item $\asig\op\ \asig\op\ s\longto \asig\op\ \snd\ \bigl((v,f),(u,g)\to(f(v,u),g),\epsilon,s\bigr)$
+    \item $\asig\op\ \asig\ s\longto \asig\ \snd\ \bigl((v,f),u\longto f(v,u),\epsilon,s\bigr)$
 \elist
 Where $\fst,\snd$ are the first and second projection maps respectively.
-Notice that here things of the form $(n,f)$ etc. are {\it values} (which are just arbitrary, and different from \value s).
+Notice that here things of the form $(n,f)$ etc. are {\it values} (which are just arbitrary).
+We further define the abstract types $\num$ and $\str$.
 These abstract types we have just defined allow for basic arithmetic:
 $$ \eqalign{
-    \value_\infty(1) \op_1(+) \value_\infty(2) \op_2(\cdot) \value_\infty(3)\eend_0 &\longto \op_1(1,+)\value_\infty(2)\op_2(\cdot)\value_\infty(3)\eend_0\cr
-    &\longto \op_1(1,+)\op_2(2,\cdot)\value_\infty(3)\eend_0\cr
-    &\longto \op_1(1,+)\op_2(2,\cdot)\value_0(3)\cr
-    &\longto \op_1(1,+)\value_0(6)\cr
-    &\longto \value_0(7)
+    \num_\infty(1) \op_1(+) \num_\infty(2) \op_2(\cdot) \num_\infty(3)\eend_0 &\longto \num\op_1(1,+)\num_\infty(2)\op_2(\cdot)\num_\infty(3)\eend_0\cr
+    &\longto \num\op_1(1,+)\num\op_2(2,\cdot)\num_\infty(3)\eend_0\cr
+    &\longto \num\op_1(1,+)\num\op_2(2,\cdot)\num_0(3)\cr
+    &\longto \num\op_1(1,+)\num_0(6)\cr
+    &\longto \num_0(7)
 } $$
-Other than numbers, $\value$ can also be strings and lists.
 
-We further define $\lparen$ and $\rparen$, as well as $\vrparen$ (value rparen) as follows:
+We further define $\lparen$ and $\rparen$, as well as the compound type $\asig\rparen$ as follows:
 \blist
-    \item $\value\ \rparen\ s\longto \vrparen\ \snd\ \bigl(n\to n,\epsilon,s\bigr)$
-    \item $\op\ \vrparen\ s\longto \vrparen\ \snd\ \bigl((f,n),m\to f(n,m),\epsilon,s\bigr)$
-    \item $\lparen\ \vrparen\ s\longto \value\ \fst\ \bigl(n\to n,\epsilon,s\bigr)$
+    \item $\asig\ \rparen\ s\longto \asig\rparen\ \snd\ \bigl(n\to n,\epsilon,s\bigr)$
+    \item $\asig\op\ \asig\rparen\ s\longto \asig\rparen\ \snd\ \bigl((f,n),m\to f(n,m),\epsilon,s\bigr)$
+    \item $\lparen\ \asig\rparen\ s\longto \asig\ \fst\ \bigl(n\to n,\epsilon,s\bigr)$
 \elist
 
 \noindent{\bf Lists:}
-We add $\lbrack$, $\rbrack$, and $\list$.
+We add $\lbrack$, $\rbrack$, the compound type $\asig\lbrack$, the compound type $\asig\list$, $\period$, and $\index$:
 \blist
-    \item $\lbrack\ {\astyle\sigma}\ s\longto \lbrack\ \snd\ \bigl(\ell,u\to(\ell,u),\epsilon,s\bigr)$ for ${\astyle\sigma}\neq\lbrack,\rbrack$
-    \item $\lbrack\ \rbrack\ s\longto \list\ {\sf infty}\ \bigl(\ell\to\ell,\epsilon,s\bigr)$
+    \item $\lbrack\ {\astyle\sigma}\ s\longto \asig\lbrack\ \snd\ \bigl(u\to(u),\epsilon,s\bigr)$ for ${\astyle\sigma}\neq\lbrack,\rbrack$
+    \item $\asig\lbrack\ {\astyle\sigma}\ s\longto \asig\lbrack\ \snd\ \bigl(\ell,u\to(\ell,\sigma(u)),\epsilon,s\bigr)$ for ${\astyle\sigma}\neq\lbrack,\rbrack$
+    \item $\asig\lbrack\ \rbrack\ s\longto \asig\list\ {\sf infty}\ \bigl(\ell\to\ell,\epsilon,s\bigr)$
+    \item $\period\ \num\ s\longto \index\ {\sf zero}\ \bigl(n\to n,\epsilon,s\bigr)$
+    \item $\asig\list\ \index\ s\longto \asig\ \fst\ \bigl((v_0,\dots,v_n),i\to v_i,\epsilon,s\bigr)$
 \elist
 So for example $[1+2;2;]$ will be converted to (really this is misleading, since the printable tokens aren't converted into abstract tokens before parsing, but rather during it.
 The following example is just to give some intuition)
 \lmultlines{
-    \lbrack_0 \value_\infty(1) \op_1(+) \value_\infty(2)\eend_0 \value_\infty(2)\eend_0 \rbrack_0\cr
-    &\longto \lbrack_0 \op_1(1,+) \value_\infty(2)\eend_0 \value_\infty(2)\eend_0\rbrack_0\cr
-    &\longto \lbrack_0\op_1(1,+)\value_0(2)\value_\infty(2)\eend_0\rbrack_0\cr
-    &\longto \lbrack_0\value_0(3)\value_\infty(2)\eend_0\rbrack_0\cr
-    &\longto \lbrack_0(3)\value_\infty(2)\eend_0\rbrack_0\cr
-    &\longto \lbrack_0(3)\value_0(2)\rbrack_0\cr
-    &\longto \lbrack_0(3,2)\rbrack_0\cr
-    &\longto \list_\infty(3,2)\cr
+    \lbrack_0 \num_\infty(1) \op_1(+) \num_\infty(2)\eend_0 \num_\infty(2)\eend_0 \rbrack_0\cr
+    &\longto \lbrack_0 \num\op_1(1,+) \num_\infty(2)\eend_0 \num_\infty(2)\eend_0\rbrack_0\cr
+    &\longto \lbrack_0 \num\op_1(1,+) \num_0(2) \num_\infty(2) \eend_0\rbrack_0\cr
+    &\longto \lbrack_0 \num_0(3) \num_\infty(2) \eend_0\rbrack_0\cr
+    &\longto \num\lbrack_0(3) \num_\infty(2)\eend_0\rbrack_0\cr
+    &\longto \num\lbrack_0(3) \num_0(2)\rbrack_0\cr
+    &\longto \num\lbrack_0(3,2)\rbrack_0\cr
+    &\longto \num\list_\infty(3,2)\cr
 }
+And
+$$ \eqalign{
+    \num\list_\infty(0,1,2,3,4)\period_\infty\num_\infty(2) &\longto \num\list_\infty(0,1,2,3,4)\index_0(2)\cr
+    &\longto\num_\infty(2)
+} $$
 
 \noindent{\bf Variables:}
 We add $\lett$, $\leteq$, $\sett$, $\seteq$, and $\equal$,
@@ -379,9 +387,9 @@ We add $\lett$, $\leteq$, $\sett$, $\seteq$, and $\equal$,
 \elist
 For example
 $$ \eqalign{
-    \lett_\infty x_\infty \equal_0 \value_\infty(2)\eend_0 & \longto \lett_\infty(x) \equal_0 \value_\infty(2)\eend_0\cr
-    &\longto \leteq_0(x) \value_\infty(2)\eend_0\cr
-    &\longto \leteq_0(x) \value_0(2)\cr
+    \lett_\infty x_\infty \equal_0 \num_\infty(2)\eend_0 & \longto \lett_\infty(x) \equal_0 \num_\infty(2)\eend_0\cr
+    &\longto \leteq_0(x) \num_\infty(2)\eend_0\cr
+    &\longto \leteq_0(x) \num_0(2)\cr
     &\longto \epsilon\cr
 } $$
 and the state will have changed to $s[x\mapsto2]$.
