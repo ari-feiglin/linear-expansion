@@ -378,12 +378,16 @@ $$ \eqalign{
 \noindent{\bf Variables:}
 We add $\lett$, $\leteq$, $\sett$, $\seteq$, and $\equal$,
 \blist
-    \item $\lett\ x\ s\longto \lett\ \snd\ \bigl(\to x,\epsilon,s\bigr)$
-    \item $\lett\ \equal\ s\longto \leteq\ \snd\ \bigl(x\to x,\epsilon,s\bigr)$
-    \item $\leteq\ {\astyle\sigma}\ s\longto \epsilon\ \fst\ \bigl(x,v\to \epsilon,\epsilon,s[x\mapsto\sigma(v)]\bigr)$
-    \item $\sett\ x\ s\longto \sett\ \snd\ \bigl(\to x,\epsilon,s\bigr)$
-    \item $\sett\ \equal\ s\longto \seteq\ \snd\ \bigl(x\to x,\epsilon,s\bigr)$
-    \item $\seteq\ {\astyle\sigma}\ s\longto \epsilon\ \fst\ \bigl(x,v\to \epsilon,\epsilon,s\{x\mapsto\sigma(v)\}\bigr)$
+    \item $\lett\ x\ s\longto \lett\ \snd\ \bigl(\to (x,\varnothing),\epsilon,s\bigr)$
+    \item $\lett\ \index\ s\longto \lett\ \fst\ \bigl((x,\ell),n\to(x,(\ell,n)),\epsilon,s\bigr)$
+    \item $\lett\ \equal\ s\longto \leteq\ \snd\ \bigl((x,\ell)\to (x,\ell),\epsilon,s\bigr)$
+    \item $\leteq\ {\astyle\sigma}\ s\longto \epsilon\ \fst\ \bigl((x,\ell),v\to \epsilon,\epsilon,s'\bigr)$ where $s'$ is $s[x\mapsto\sigma(v)]$ if $\ell=\varnothing$ otherwise if $\ell=(i_1,\dots,i_n)$
+        then let $\varkappa$ be $s(x)$ where $s(x).i_1\dots i_n$ is set to be $v$, then $s'=s[x\mapsto\varkappa]$.
+    \item $\sett\ x\ s\longto \sett\ \snd\ \bigl(\to (x,\varnothing),\epsilon,s\bigr)$
+    \item $\sett\ \index\ s\longto \sett\ \fst\ \bigl((x,\ell),n\to(x,(\ell,n)),\epsilon,s\bigr)$
+    \item $\sett\ \equal\ s\longto \seteq\ \snd\ \bigl((x,\ell)\to(x,\ell),\epsilon,s\bigr)$
+    \item $\seteq\ {\astyle\sigma}\ s\longto \epsilon\ \fst\ \bigl((x,\ell),v\to \epsilon,\epsilon,s'\bigr)$ where $s'$ is $s[x\mapsto v]$ if $\ell$ is empty and otherwise if $\ell=(i_1,\dots,i_n)$ then
+        let $\varkappa$ be $s(x)$ where $s(x).i_1.i_2\dots i_n$ is swapped with $v$, and $s'$ is $s\{x\mapsto\varkappa\}$.
 \elist
 For example
 $$ \eqalign{
@@ -392,7 +396,17 @@ $$ \eqalign{
     &\longto \leteq_0(x) \num_0(2)\cr
     &\longto \epsilon\cr
 } $$
-and the state will have changed to $s[x\mapsto2]$.
+and the state will have changed to $s[x\mapsto\num(2)]$.
+And if $s$ is a state where $x\mapsto\num\list(0,1)$ then
+$$ \eqalign{
+    \lett_\infty x_\infty \period_\infty \num_\infty(1) \equal_0 \num_\infty(2) &\longto \lett_\infty(x) \period_\infty \num_\infty(1) \equal_0 \num_\infty(2)\eend_0\cr
+    &\longto \lett_\infty(x) \index_0(1) \equal_0 \num_\infty(2)\eend_0\cr
+    &\longto \lett_\infty(x,(1)) \equal_0 \num_\infty(2)\eend_0\cr
+    &\longto \leteq_0(x,(1)) \num_\infty(2)\eend_0\cr
+    &\longto \leteq_0(x,(1)) \num_0(2)\cr
+    &\longto \epsilon\cr
+} $$
+and the state will have changed to $s[x\mapsto\num\list(0,2)]$.
 
 \noindent{\bf Scoping:}
 We add $\lbrace$ and $\rbrace$:
@@ -400,7 +414,7 @@ We add $\lbrace$ and $\rbrace$:
     \item $\lbrace\ \epsilon\ s\longto \epsilon\ \fst\ \bigl(\to \epsilon,\epsilon,s+\varnothing\bigr)$
     \item $\rbrace\ \epsilon\ s\longto \epsilon\ \fst\ \bigl(\to \epsilon,\epsilon,\pop s\bigr)$
 \elist
-This highlights the difference between $\lett$ and $\sett$: $\lett$ creates a new variable in the current scope, and $\sett$ alters an existing variable in the scope for which it is defined.
+This highlights another difference between $\lett$ and $\sett$: $\lett$ creates a new variable in the current scope, and $\sett$ alters an existing variable in the scope for which it is defined.
 This is like doing {\tt int x = 0} vs {\tt x = 0} in C.
 
 \bye
