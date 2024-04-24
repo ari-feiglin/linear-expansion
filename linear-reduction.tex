@@ -411,11 +411,36 @@ and the state will have changed to $s[x\mapsto\num\list(0,2)]$.
 \noindent{\bf Scoping:}
 We add $\lbrace$ and $\rbrace$:
 \blist
-    \item $\lbrace\ \epsilon\ s\longto \epsilon\ \fst\ \bigl(\to \epsilon,\epsilon,s+\varnothing\bigr)$
-    \item $\rbrace\ \epsilon\ s\longto \epsilon\ \fst\ \bigl(\to \epsilon,\epsilon,\pop s\bigr)$
+    \item $\lbrace\ \epsilon\ s\longto \epsilon\ \varnothing\ \bigl(\to \epsilon,\epsilon,s+\varnothing\bigr)$
+    \item $\rbrace\ \epsilon\ s\longto \epsilon\ \varnothing\ \bigl(\to \epsilon,\epsilon,\pop s\bigr)$
 \elist
 This highlights another difference between $\lett$ and $\sett$: $\lett$ creates a new variable in the current scope, and $\sett$ alters an existing variable in the scope for which it is defined.
 This is like doing {\tt int x = 0} vs {\tt x = 0} in C.
+
+\noindent{\bf Functions:}
+First we need a way of capturing the input variable list for a function.
+To do so, we add ``alternative'' the alternative abstract type $\lparen\a$ as well as $\fun,\fun\a$ and $\plist$ (parameter list).
+\blist
+    \item $\fun\ x\ s\longto \fun\a\ \fst\ \bigl(\to x,\epsilon,s+[\{\mapsto\lbrace\a,\}\mapsto\rbrace\a,(\mapsto\lparen\a,)\mapsto\rparen\a]\bigr)$
+    \item $\lparen\a\ x\ s\longto \lparen\a\ \fst\ \bigl(\ell\to(\ell,x),\epsilon,s\bigr)$ for $x\neq)$
+    \item $\lparen\a\ )\ s\longto \plist\ \fst\ \bigl(\ell\to\ell,\epsilon,s\bigr)$
+    \item $\fun\a\ \plist\ s\longto\fun\a\ \fst\ \bigl(x,\ell\to (x,\ell),\epsilon,s\bigr)$
+\elist
+\noindent Next we need to capture the code for the function.
+Again we add an alternative type $\lbrace\a$ and $\code$.
+\blist
+    \item $\lbrace\a\ x\ s\longto \lbrace\a\ \fst\ \bigl(\quote\xi\to\quote{\xi x},\epsilon,s\bigr)$ for $x\neq\{,\}$
+    \item $\lbrace\a\ \}\ s\longto \code\ \fst\ \bigl(\quote\xi\to\quote{\{\xi\}},\epsilon,s\bigr)$
+    \item $\lbrace\a\ \code\ s\longto \lbrace\a\ \fst\ \bigl(\quote\xi,\quote{\xi'}\to\quote{\xi\xi'},\epsilon,s\bigr)$
+\elist
+\noindent Now we convert $\fun\a$ and $\code$ to a $\closure$
+\blist
+    \item $\fun\a\ \code\ s\longto \closure\ \fst\ \bigl((x,\ell),\quote\xi\to C=\gen{\ell,\quote\xi,\pop s[x\mapsto\closure(C)]},\pop s[x\mapsto\closure(C)]\bigr)$
+\elist
+\noindent And now we add rules for calling a function
+\blist
+    \item $\closure\ \list\ s\longto \epsilon\ \varnothing\ \bigl(\gen{\ell,\quote{\{\xi\}},s},\ell'\to \epsilon,\xi\},s+[\ell\mapsto\ell']\bigr)$
+\elist
 
 \bye
 
