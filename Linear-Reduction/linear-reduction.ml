@@ -27,10 +27,10 @@ let rec atype_to_str t =
     match t with
     | None -> "None"
     | End -> "End"
-    | Op(t) -> "Op(" ^ (atype_to_str t) ^ ")"
+    | Op(t) -> "Op{" ^ (atype_to_str t) ^ "}"
     | Num -> "Num"
     | Lparen -> "Lparen"
-    | Rparen(t) -> "Rparen(" ^ (atype_to_str t) ^ ")"
+    | Rparen(t) -> "Rparen{" ^ (atype_to_str t) ^ "}"
 ;;
 
 type abstract_value = abstract_type * value;;
@@ -49,6 +49,9 @@ class extnum (v : int) (isinf : bool) =
             if self#infty then true
             else if not other#infty && self#value >= other#value then true
             else false
+        method str =
+            if self#infty then "infty"
+            else string_of_int (self#value)
     end
 ;;
 
@@ -94,20 +97,33 @@ class state =
 
 exception Foo of string;;
 
-let rec initial_beta (fst : abstract_type) (snd : any_type) (state : state) :
+let rec initial_beta (first : abstract_type) (second : any_type) (state : state) :
     (abstract_type * (extnum * extnum -> extnum) * (value * value -> value * printable_type list * state)) =
-    match fst, snd with
+    match first, second with
     | s, AType(End) -> (s, zero, fun (u,v) -> (u, [], state))
-    | s, AType(Op(None)) -> (Op(s), zero, fun (v, PreOpVal(f)) -> (OpVal(v,f), [], state))
-    | Op(s), AType(Op(t)) -> if s = t then (Op(s), zero, (fun (OpVal(v,f),OpVal(u,g)) -> (OpVal(f(v,u),g), [], state))) else raise (Foo "s not t")
-    | Op(s), AType(t) -> if s = t then (s, zero, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Foo "s not t")
+    | s, AType(Op(None)) -> (Op(s), snd, fun (v, PreOpVal(f)) -> (OpVal(v,f), [], state))
+    | Op(s), AType(Op(t)) -> if s = t then (Op(s), snd, (fun (OpVal(v,f),OpVal(u,g)) -> (OpVal(f(v,u),g), [], state))) else raise (Failure "s not t")
+    | Op(s), AType(t) -> if s = t then (s, snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
+    | s, AType(Rparen(None)) -> (Rparen(s), snd, fun (u,_) -> (u, [], state))
+    | Op(s), AType(Rparen(t)) -> print_endline "HELLO"; if s = t then (Rparen(s), snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
+    | Lparen, AType(Rparen(s)) -> (s, fst, fun (_,u) -> (u, [], state))
 ;;
 
 let first3 = fun (a,b,c) -> a;;
 let second3 = fun (a,b,c) -> b;;
 let third3 = fun (a,b,c) -> c;;
 
-let initial_priority tok = new extnum 0 false;;
+let initial_priority s =
+    try int_of_string s; new extnum 0 true
+    with Failure _ -> (
+        match s with
+        | ";" -> new extnum 0 false
+        | "(" -> new extnum 0 true
+        | ")" -> new extnum 0 false
+        | "+" -> new extnum 1 false
+        | "*" -> new extnum 2 false
+    )
+;;
 
 let rec initial_priorities str =
     match str with 
@@ -118,8 +134,8 @@ let rec initial_priorities str =
 let rec print_tokens (str,state : token list * state) =
     match str with
     | [] -> print_endline ""
-    | PrintableToken(t,n) :: str -> print_string (t ^ " "); print_tokens (str, state)
-    | AbstractToken((t,v),n) :: str -> print_string ((atype_to_str t) ^ "(" ^ (value_to_str v) ^ ")"); print_tokens (str,state)
+    | PrintableToken(t,n) :: str -> print_string (t ^ (n#str) ^ " "); print_tokens (str, state)
+    | AbstractToken((t,v),n) :: str -> print_string ((atype_to_str t) ^ "_" ^ (n#str) ^ "(" ^ (value_to_str v) ^ ") "); print_tokens (str,state)
 ;;
 
 let rec derived_beta (str, state: token list * state) : (token list * state) =
@@ -141,7 +157,7 @@ let rec derived_beta (str, state: token list * state) : (token list * state) =
             match str with
             | [] -> raise (Failure "Can't match abstract token with nothing")
             | AbstractToken((s,u),m) :: strA -> (
-                if true then (*n#geq m then*)
+                if n#geq m then
                     try (
                         let ib = initial_beta t (AType(s)) state in
                         let new_type = first3 ib in
@@ -165,7 +181,7 @@ let rec derived_beta (str, state: token list * state) : (token list * state) =
                     AbstractToken((t,v),n) :: str, state
             )
             | PrintableToken(s,m) :: strA -> (
-                if true then (*n#geq m then*)
+                if n#geq m then
                     try (
                         let ib = initial_beta t (PType s) state in
                         let new_type = first3 ib in
@@ -192,11 +208,21 @@ let rec derived_beta (str, state: token list * state) : (token list * state) =
     )
 ;;
 
+let rec total_beta (str : token list) (state : state) =
+    print_tokens (str, state);
+    let res = derived_beta (str, state) in
+    let str = fst res in
+    let state = snd res in
+    if str != [] then
+        total_beta str state
+
 let initial_state = fun x ->
     try (Num, NumVal(Float.of_string x))
     with Failure _ -> (
         match x with
         | ";" -> (End, None)
+        | "(" -> (Lparen, None)
+        | ")" -> (Rparen None, None)
         | "+" -> (Op None, PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n+.m)))
         | "*" -> (Op None, PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n*.m)))
     )
@@ -205,4 +231,4 @@ let initial_state = fun x ->
 let state = new state;;
 state#push initial_state;;
 
-((initial_priorities ["1"; "+"; "2"; ";"]), state) |> derived_beta |> derived_beta |> derived_beta |> derived_beta |> derived_beta |> print_tokens;;
+total_beta (initial_priorities ["(" ; "1"; "+"; "2"; ")" ; "*"; "3"; ";"]) state;;
