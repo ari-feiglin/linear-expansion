@@ -3,6 +3,7 @@ type value =
     | NumVal of float
     | PreOpVal of ((value * value) -> value)
     | OpVal of value * (value * value -> value)
+    | ListVal of value list
 ;;
 
 let rec value_to_str v =
@@ -11,6 +12,12 @@ let rec value_to_str v =
     | NumVal(f) -> Float.to_string f
     | PreOpVal(f) -> "fun"
     | OpVal(v,f) -> (value_to_str v) ^ " fun"
+    | ListVal(l) -> (
+        match l with
+        | [] -> ""
+        | x :: l -> (value_to_str x) ^ "," ^ (value_to_str (ListVal l))
+    )
+;;
 
 type printable_type = string;;
 
@@ -21,6 +28,11 @@ type abstract_type =
     | Num
     | Lparen
     | Rparen of abstract_type
+    | Lbrack of abstract_type
+    | Rbrack
+    | List of abstract_type
+    | Period
+    | Index
 ;;
 
 let rec atype_to_str t =
@@ -31,6 +43,11 @@ let rec atype_to_str t =
     | Num -> "Num"
     | Lparen -> "Lparen"
     | Rparen(t) -> "Rparen{" ^ (atype_to_str t) ^ "}"
+    | Lbrack(t) -> "Lbrack{" ^ (atype_to_str t) ^ "}"
+    | Rbrack -> "Rbrack"
+    | List(t) -> "List{" ^ (atype_to_str t) ^ "}"
+    | Period -> "Period"
+    | Index -> "Index"
 ;;
 
 type abstract_value = abstract_type * value;;
@@ -70,6 +87,7 @@ type token =
 ;;
 
 let zero = fun (n,m) -> new extnum 0 false;;
+let infty = fun (n,m) -> new extnum 0 true;;
 
 type partial_state = printable_type -> abstract_value;;
 
@@ -104,6 +122,13 @@ class state =
 
 exception Foo of string;;
 
+let rec index_list l i =
+    match l, i with
+    | ListVal [], _ -> raise (Invalid_argument "Bound out of range")
+    | ListVal (t :: l), 0 -> t
+    | ListVal (t :: l), i -> index_list (ListVal l) (i - 1)
+;;
+
 let rec initial_beta (first : abstract_type) (second : any_type) (state : state) :
     (abstract_type * (extnum * extnum -> extnum) * (value * value -> value * printable_type list * state)) =
     match first, second with
@@ -115,6 +140,16 @@ let rec initial_beta (first : abstract_type) (second : any_type) (state : state)
     | Lparen,   AType(Rparen s) -> (s, fst, fun (_,u) -> (u, [], state))
     (* Very vague match, keep last *)
     | Op s,     AType(t) -> if s = t then (s, snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
+    (* *)
+    | Lbrack(None), AType(s) -> (
+        match s with
+        | Lbrack _ -> raise (Failure "Cannot match lbrack with lbrack")
+        | s -> (Lbrack(s), snd, fun (_,u) -> (ListVal [u], [], state))
+    )
+    | Lbrack(s), AType(Rbrack) -> (List(s), infty, fun (l,_) -> (l, [], state))
+    | Lbrack(s), AType(t) -> if s = t then (Lbrack(s), snd, fun (ListVal l,u) -> (ListVal (l @ [u]), [], state)) else raise (Failure "Cannot match list with different type")
+    | Period, AType(Num) -> (Index, zero, fun (_,n) -> n, [], state)
+    | List(s), AType Index -> (s, fst, fun (l, NumVal n) -> index_list l (int_of_float n), [], state)
 ;;
 
 let first3 = fun (a,b,c) -> a;;
@@ -130,6 +165,11 @@ let initial_priority s =
         | ")" -> new extnum 0 false
         | "+" -> new extnum 1 false
         | "*" -> new extnum 2 false
+        | "-" -> new extnum 1 false
+        | "/" -> new extnum 2 false
+        | "[" -> new extnum 0 false
+        | "]" -> new extnum 0 false
+        | "." -> new extnum 0 true
     )
 ;;
 
@@ -142,7 +182,7 @@ let rec initial_priorities str =
 let rec print_tokens (str,state : token list * state) =
     match str with
     | [] -> print_endline ""
-    | PrintableToken(t,n) :: str -> print_string (t ^ (n#str) ^ " "); print_tokens (str, state)
+    | PrintableToken(t,n) :: str -> print_string (t ^ "_" ^ (n#str) ^ " "); print_tokens (str, state)
     | AbstractToken((t,v),n) :: str -> print_string ((atype_to_str t) ^ "_" ^ (n#str) ^ "(" ^ (value_to_str v) ^ ") "); print_tokens (str,state)
 ;;
 
@@ -233,10 +273,15 @@ let initial_state = fun x ->
         | ")" -> (Rparen None, None)
         | "+" -> (Op None, PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n+.m)))
         | "*" -> (Op None, PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n*.m)))
+        | "-" -> (Op None, PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n-.m)))
+        | "/" -> (Op None, PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n/.m)))
+        | "[" -> (Lbrack None, None)
+        | "]" -> (Rbrack, None)
+        | "." -> (Period, None)
     )
 ;;
 
 let state = new state;;
 state#push initial_state;;
 
-total_beta (initial_priorities ["(" ; "1"; "+"; "2"; ")" ; "*" ; "3" ; ";"]) state;;
+total_beta (initial_priorities ["[" ; "2"; ";"; "1" ; ";" ; "]" ; "." ; "1" ; "+" ; "2" ; ";"]) state
