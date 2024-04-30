@@ -239,4 +239,4 @@ let initial_state = fun x ->
 let state = new state;;
 state#push initial_state;;
 
-total_beta (initial_priorities ["(" ; "1"; "+"; "2"; ")" ; ";"]) state;;
+total_beta (initial_priorities ["(" ; "1"; "+"; "2"; ")" ; "*" ; "3" ; ";"]) state;;
