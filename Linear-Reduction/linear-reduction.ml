@@ -41,6 +41,13 @@ type any_type =
     | None
 ;;
 
+let anytype_to_str t =
+    match t with
+    | AType s -> "AType " ^ atype_to_str s
+    | PType s -> "PType " ^ s
+    | None -> ""
+;;
+
 class extnum (v : int) (isinf : bool) =
     object(self)
         method value = v
@@ -100,13 +107,14 @@ exception Foo of string;;
 let rec initial_beta (first : abstract_type) (second : any_type) (state : state) :
     (abstract_type * (extnum * extnum -> extnum) * (value * value -> value * printable_type list * state)) =
     match first, second with
-    | s, AType(End) -> (s, zero, fun (u,v) -> (u, [], state))
-    | s, AType(Op(None)) -> (Op(s), snd, fun (v, PreOpVal(f)) -> (OpVal(v,f), [], state))
-    | Op(s), AType(Op(t)) -> if s = t then (Op(s), snd, (fun (OpVal(v,f),OpVal(u,g)) -> (OpVal(f(v,u),g), [], state))) else raise (Failure "s not t")
-    | Op(s), AType(t) -> if s = t then (s, snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
-    | s, AType(Rparen(None)) -> (Rparen(s), snd, fun (u,_) -> (u, [], state))
-    | Op(s), AType(Rparen(t)) -> print_endline "HELLO"; if s = t then (Rparen(s), snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
-    | Lparen, AType(Rparen(s)) -> (s, fst, fun (_,u) -> (u, [], state))
+    | s,        AType(End) -> (s, zero, fun (u,v) -> (u, [], state))
+    | s,        AType(Op None) -> (Op(s), snd, fun (v, PreOpVal(f)) -> (OpVal(v,f), [], state))
+    | Op s,     AType(Op t) -> if s = t then (Op(s), snd, (fun (OpVal(v,f),OpVal(u,g)) -> (OpVal(f(v,u),g), [], state))) else raise (Failure "s not t")
+    | Op s,     AType(Rparen t) -> if s = t then (Rparen(s), snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
+    | s,        AType(Rparen None) -> (Rparen(s), snd, fun (u,_) -> (u, [], state))
+    | Lparen,   AType(Rparen s) -> (s, fst, fun (_,u) -> (u, [], state))
+    (* Very vague match, keep last *)
+    | Op s,     AType(t) -> if s = t then (s, snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
 ;;
 
 let first3 = fun (a,b,c) -> a;;
@@ -231,4 +239,4 @@ let initial_state = fun x ->
 let state = new state;;
 state#push initial_state;;
 
-total_beta (initial_priorities ["(" ; "1"; "+"; "2"; ")" ; "*"; "3"; ";"]) state;;
+total_beta (initial_priorities ["(" ; "1"; "+"; "2"; ")" ; ";"]) state;;
