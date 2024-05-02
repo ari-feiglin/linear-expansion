@@ -97,7 +97,8 @@ let get_all_tokens s =
             let res = get_next_token s i Whitespace in
             let tok = fst res in
             let index = snd res in
-            tok :: (helper s index)
+            if tok = "" then helper s index
+            else tok :: (helper s index)
     in helper s 0
 ;;
 
