@@ -1,9 +1,12 @@
+type printable_type = string;;
+
 type value =
     | None
     | NumVal of float
     | PreOpVal of ((value * value) -> value)
     | OpVal of value * (value * value -> value)
     | ListVal of value list
+    | LetVal of printable_type * (int list)
 ;;
 
 let rec value_to_str v =
@@ -17,9 +20,9 @@ let rec value_to_str v =
         | [] -> ""
         | x :: l -> (value_to_str x) ^ "," ^ (value_to_str (ListVal l))
     )
+    | LetVal (v,l) -> v ^ (List.fold_left (fun acc x -> acc ^ " " ^ (string_of_int x)) "" l)
 ;;
 
-type printable_type = string;;
 
 type abstract_type =
     | None
@@ -33,6 +36,9 @@ type abstract_type =
     | List of abstract_type
     | Period
     | Index
+    | Let
+    | Leteq
+    | Equal
 ;;
 
 let rec atype_to_str t =
@@ -48,6 +54,9 @@ let rec atype_to_str t =
     | List(t) -> "List{" ^ (atype_to_str t) ^ "}"
     | Period -> "Period"
     | Index -> "Index"
+    | Let -> "Let"
+    | Leteq -> "Leteq"
+    | Equal -> "Equal"
 ;;
 
 type abstract_value = abstract_type * value;;
@@ -70,11 +79,11 @@ class extnum (v : int) (isinf : bool) =
         method value = v
         method infty = isinf
         method geq (other : extnum) : bool =
-            if self#infty then true
+            if (self#infty && self#value >= 0) || (other#infty && other#value < 0) then true
             else if not other#infty && self#value >= other#value then true
             else false
         method str =
-            if self#infty then "infty"
+            if self#infty then if self#value < 0 then "-infty" else "infty"
             else string_of_int (self#value)
     end
 ;;
@@ -88,15 +97,16 @@ type token =
 
 let zero = fun (n,m) -> new extnum 0 false;;
 let infty = fun (n,m) -> new extnum 0 true;;
+let minfty = fun (n,m) -> new extnum (-1) true;;
 
 type partial_state = printable_type -> abstract_value;;
 
-let rec valuate stack x =
+let rec valuate_stack stack (x : printable_type) : abstract_value =
     match stack with
     | [] -> raise (Failure ("value does not exist in stack"))
     | t :: stack -> (
         try t(x) with
-        | Failure(_) -> valuate stack x
+        | Failure(_) -> valuate_stack stack x
     )
 ;;
 
@@ -115,8 +125,9 @@ class state =
                 try pstate(x) with
                 | Failure(_) -> top(x)
             ) in
-            self#push new_top
-        method valuate x = valuate pstate_stack x
+            self#push new_top;
+            self
+        method valuate x = valuate_stack pstate_stack x
     end
 ;;
 
@@ -129,10 +140,45 @@ let rec index_list l i =
     | ListVal (t :: l), i -> index_list (ListVal l) (i - 1)
 ;;
 
+let unvaluelist v =
+    match v with
+    | ListVal l -> l
+    | _ -> raise (Invalid_argument "Cannot unvalue something which is not a list")
+;;
+
+let rec swap_list (l : value) (ns : int list) (x : value) =
+    match l, ns with
+    | _, [] -> x
+    | ListVal [], _ -> raise (Invalid_argument "Cannot give an empty list")
+    | ListVal (k :: l), t :: ns -> (
+        if t = 0 then
+            ListVal ((swap_list k ns x) :: l)
+        else
+            ListVal (k :: (unvaluelist (swap_list (ListVal l) ((t - 1) :: ns) x)))
+    )
+;;
+
+let let_new_state (state : state) (s : abstract_type) (x : printable_type) (v : value) (ns : int list) : partial_state =
+    if ns = [] then
+        fun y -> (
+            if y = x then (s, v)
+            else raise (Failure "not defined")
+        )
+    else
+        let old_val = state#valuate x in
+        let kappa = snd old_val in
+        let new_kappa = swap_list kappa ns v in
+        fun y -> (
+            if y = x then ((fst old_val), new_kappa)
+            else raise (Failure "not defined")
+        )
+;;
+
+
 let rec initial_beta (first : abstract_type) (second : any_type) (state : state) :
     (abstract_type * (extnum * extnum -> extnum) * (value * value -> value * printable_type list * state)) =
     match first, second with
-    | s,        AType(End) -> (s, zero, fun (u,v) -> (u, [], state))
+    | s,        AType(End) -> (s, minfty, fun (u,v) -> (u, [], state))
     | s,        AType(Op None) -> (Op(s), snd, fun (v, PreOpVal(f)) -> (OpVal(v,f), [], state))
     | Op s,     AType(Op t) -> if s = t then (Op(s), snd, (fun (OpVal(v,f),OpVal(u,g)) -> (OpVal(f(v,u),g), [], state))) else raise (Failure "s not t")
     | Op s,     AType(Rparen t) -> if s = t then (Rparen(s), snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
@@ -144,12 +190,21 @@ let rec initial_beta (first : abstract_type) (second : any_type) (state : state)
     | Lbrack(None), AType(s) -> (
         match s with
         | Lbrack _ -> raise (Failure "Cannot match lbrack with lbrack")
-        | s -> (Lbrack(s), snd, fun (_,u) -> (ListVal [u], [], state))
+        | s -> (Lbrack(s), fst, fun (_,u) -> (ListVal [u], [], state))
     )
     | Lbrack(s), AType(Rbrack) -> (List(s), infty, fun (l,_) -> (l, [], state))
-    | Lbrack(s), AType(t) -> if s = t then (Lbrack(s), snd, fun (ListVal l,u) -> (ListVal (l @ [u]), [], state)) else raise (Failure "Cannot match list with different type")
+    | Lbrack(s), AType(t) -> if s = t then (Lbrack(s), fst, fun (ListVal l,u) -> (ListVal (l @ [u]), [], state)) else raise (Failure "Cannot match list with different type")
     | Period, AType(Num) -> (Index, zero, fun (_,n) -> n, [], state)
     | List(s), AType Index -> (s, fst, fun (l, NumVal n) -> index_list l (int_of_float n), [], state)
+    (* Note changes to let stuff *)
+    | Let, PType x -> (
+        match x with
+        | "=" -> (Leteq, minfty, fun (x,_) -> x, [], state)
+        | "." -> raise (Failure "Cannot match let with .")
+        | _ ->(Let, snd, fun (_,_) -> LetVal (x, []), [], state)
+    )
+    | Let, AType Index -> (Let, fst, fun (LetVal (x,l), NumVal n) -> LetVal (x, l @ [int_of_float n]), [], state)
+    | Leteq, AType s -> (None, fst, fun (LetVal (x,l), v) -> None, [], state#alter (let_new_state state s x v l))
 ;;
 
 let first3 = fun (a,b,c) -> a;;
@@ -170,6 +225,7 @@ let initial_priority s =
         | "[" -> new extnum 0 false
         | "]" -> new extnum 0 false
         | "." -> new extnum 0 true
+        | _ -> new extnum 0 true
     )
 ;;
 
@@ -199,7 +255,10 @@ let rec derived_beta (str, state: token list * state) : (token list * state) =
             let new_value = first3 val_type_state in
             let typestr = second3 val_type_state in
             let new_state = third3 val_type_state in
-            ((AbstractToken((new_type, new_value), new_priority) :: initial_priorities typestr) @ str, new_state)
+            if new_type = None then
+                (initial_priorities typestr @ str, new_state)
+            else
+                ((AbstractToken((new_type, new_value), new_priority) :: initial_priorities typestr) @ str, new_state)
         ) with
         | Match_failure(_) | Failure _ -> (
             match str with
@@ -214,7 +273,10 @@ let rec derived_beta (str, state: token list * state) : (token list * state) =
                         let new_value = first3 val_type_state in
                         let typestr = second3 val_type_state in
                         let new_state = third3 val_type_state in
-                        ((AbstractToken((new_type, new_value), new_priority) :: initial_priorities typestr) @ strA, new_state)
+                        if new_type = None then
+                            (initial_priorities typestr @ strA, new_state)
+                        else
+                            ((AbstractToken((new_type, new_value), new_priority) :: initial_priorities typestr) @ strA, new_state)
                     ) with
                     | Match_failure _ | Failure _ -> (
                         let next = derived_beta (str, state) in
@@ -278,6 +340,8 @@ let initial_state = fun x ->
         | "[" -> (Lbrack None, None)
         | "]" -> (Rbrack, None)
         | "." -> (Period, None)
+        | "let" -> (Let, None)
+        | "=" -> (Equal, None)
     )
 ;;
 
