@@ -69,7 +69,7 @@ let str_to_list s =
 
 let toktypes = set_toktype ['~'; '!'; '@'; '#'; '$'; '%'; '^'; '&'; '*'; '-'; '+'; '='; '/'; '|'; '<'; '>';] [Op;] toktypes;;
 let toktypes = set_toktype ['0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9';] [Num; Str] toktypes;;
-let toktypes = set_toktype (str_to_list "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") [Str;] toktypes;;
+let toktypes = set_toktype (str_to_list "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_") [Str;] toktypes;;
 
 let rec get_next_token s i ttype =
     if i >= String.length s then ("", i)

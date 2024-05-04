@@ -1,29 +1,5 @@
 type printable_type = string;;
 
-type value =
-    | None
-    | NumVal of float
-    | PreOpVal of ((value * value) -> value)
-    | OpVal of value * (value * value -> value)
-    | ListVal of value list
-    | LetVal of printable_type * (int list)
-;;
-
-let rec value_to_str v =
-    match v with
-    | None -> ""
-    | NumVal(f) -> Float.to_string f
-    | PreOpVal(f) -> "fun"
-    | OpVal(v,f) -> (value_to_str v) ^ " fun"
-    | ListVal(l) -> (
-        match l with
-        | [] -> ""
-        | x :: l -> (value_to_str x) ^ "," ^ (value_to_str (ListVal l))
-    )
-    | LetVal (v,l) -> v ^ (List.fold_left (fun acc x -> acc ^ " " ^ (string_of_int x)) "" l)
-;;
-
-
 type abstract_type =
     | None
     | End
@@ -39,6 +15,7 @@ type abstract_type =
     | Let
     | Leteq
     | Equal
+    | Primitive
 ;;
 
 let rec atype_to_str t =
@@ -57,6 +34,32 @@ let rec atype_to_str t =
     | Let -> "Let"
     | Leteq -> "Leteq"
     | Equal -> "Equal"
+    | Primitive -> "Primitive"
+;;
+
+type value =
+    | None
+    | NumVal of float
+    | PreOpVal of ((value * value) -> value)
+    | OpVal of value * (value * value -> value)
+    | ListVal of value list
+    | LetVal of printable_type * (int list)
+    | PrimVal of ((abstract_type * value) -> (abstract_type * value))
+;;
+
+let rec value_to_str v =
+    match v with
+    | None -> ""
+    | NumVal(f) -> Float.to_string f
+    | PreOpVal(f) -> "fun"
+    | OpVal(v,f) -> (value_to_str v) ^ " fun"
+    | ListVal(l) -> (
+        match l with
+        | [] -> ""
+        | x :: l -> (value_to_str x) ^ "," ^ (value_to_str (ListVal l))
+    )
+    | LetVal (v,l) -> v ^ (List.fold_left (fun acc x -> acc ^ " " ^ (string_of_int x)) "" l)
+    | PrimVal _ -> "prim"
 ;;
 
 type abstract_value = abstract_type * value;;
@@ -127,6 +130,9 @@ class state =
             ) in
             self#push new_top;
             self
+        method alterval x v =
+            let pstate = fun y -> if x = y then v else raise (Failure "not defined") in
+            self#alter pstate
         method valuate x = valuate_stack pstate_stack x
     end
 ;;
@@ -205,6 +211,8 @@ let rec initial_beta (first : abstract_type) (second : any_type) (state : state)
     )
     | Let, AType Index -> (Let, fst, fun (LetVal (x,l), NumVal n) -> LetVal (x, l @ [int_of_float n]), [], state)
     | Leteq, AType s -> (None, fst, fun (LetVal (x,l), v) -> None, [], state#alter (let_new_state state s x v l))
+    (* *)
+    | Primitive, None -> (None, fst, fun (PrimVal f,_) -> let new_val = f (state#valuate "_reg_in") in (None, [], (state#alterval "_reg_out" new_val)))
 ;;
 
 let first3 = fun (a,b,c) -> a;;
@@ -342,6 +350,7 @@ let initial_state = fun x ->
         | "." -> (Period, None)
         | "let" -> (Let, None)
         | "=" -> (Equal, None)
+        | "print" -> (Primitive, PrimVal (fun (a,v) -> (print_endline (value_to_str v); (None, None))))
     )
 ;;
 
