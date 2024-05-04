@@ -2,6 +2,7 @@ type printable_type = string;;
 
 type abstract_type =
     | None
+    | Gobble
     | End
     | Op of abstract_type
     | Num
@@ -21,6 +22,7 @@ type abstract_type =
 let rec atype_to_str t =
     match t with
     | None -> "None"
+    | Gobble -> "Gobble"
     | End -> "End"
     | Op(t) -> "Op{" ^ (atype_to_str t) ^ "}"
     | Num -> "Num"
@@ -184,6 +186,7 @@ let let_new_state (state : state) (s : abstract_type) (x : printable_type) (v : 
 let rec initial_beta (first : abstract_type) (second : any_type) (state : state) :
     (abstract_type * (extnum * extnum -> extnum) * (value * value -> value * printable_type list * state)) =
     match first, second with
+    | Gobble,   (AType(_) | PType(_)) -> (None, fst, fun _ -> (None, [], state))
     | s,        AType(End) -> (s, minfty, fun (u,v) -> (u, [], state))
     | s,        AType(Op None) -> (Op(s), snd, fun (v, PreOpVal(f)) -> (OpVal(v,f), [], state))
     | Op s,     AType(Op t) -> if s = t then (Op(s), snd, (fun (OpVal(v,f),OpVal(u,g)) -> (OpVal(f(v,u),g), [], state))) else raise (Failure "s not t")
@@ -212,7 +215,7 @@ let rec initial_beta (first : abstract_type) (second : any_type) (state : state)
     | Let, AType Index -> (Let, fst, fun (LetVal (x,l), NumVal n) -> LetVal (x, l @ [int_of_float n]), [], state)
     | Leteq, AType s -> (None, fst, fun (LetVal (x,l), v) -> None, [], state#alter (let_new_state state s x v l))
     (* *)
-    | Primitive, None -> (None, fst, fun (PrimVal f,_) -> let new_val = f (state#valuate "_reg_in") in (None, [], (state#alterval "_reg_out" new_val)))
+    | Primitive, None -> (Gobble, fst, fun (PrimVal f,_) -> let new_val = f (state#valuate "_reg_in") in (None, [], (state#alterval "_reg_out" new_val)))
 ;;
 
 let first3 = fun (a,b,c) -> a;;
@@ -308,7 +311,10 @@ let rec derived_beta (str, state: token list * state) : (token list * state) =
                         let new_value = first3 val_type_state in
                         let typestr = second3 val_type_state in
                         let new_state = third3 val_type_state in
-                        ((AbstractToken((new_type, new_value), new_priority) :: initial_priorities typestr) @ strA, new_state)
+                        if new_type = None then
+                            (initial_priorities typestr @ strA, new_state)
+                        else
+                            ((AbstractToken((new_type, new_value), new_priority) :: initial_priorities typestr) @ strA, new_state)
                     ) with
                     | Match_failure _ | Failure _ -> (
                         let next = derived_beta (str, state) in

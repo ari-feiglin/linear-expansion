@@ -7,9 +7,9 @@ let tokens = get_all_tokens ("
     let y.0 = 0;
     let x.(y.0) = 2;
     let _reg_in = [[1; 2;]; [2; 3;];];
-    print
+    print;
     let _reg_in = 1;
-    print
+    print;
 ");;
 
 total_beta (initial_priorities tokens) state;;
