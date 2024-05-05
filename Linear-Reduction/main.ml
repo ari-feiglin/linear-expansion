@@ -6,7 +6,7 @@ let tokens = get_all_tokens ("
     let y = [x.1; x.0;];
     let y.0 = 0;
     let x.(y.0) = 2;
-    let _reg_in = [[1; 2;]; [2; 3;];];
+    let _reg_in = x;
     print;
     let _reg_in = 1;
     print;

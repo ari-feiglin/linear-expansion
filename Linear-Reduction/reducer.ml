@@ -3,6 +3,7 @@ type printable_type = string;;
 type abstract_type =
     | None
     | Gobble
+    | Match of abstract_type
     | End
     | Op of abstract_type
     | Num
@@ -23,6 +24,7 @@ let rec atype_to_str t =
     match t with
     | None -> "None"
     | Gobble -> "Gobble"
+    | Match(t) -> "Match{" ^ (atype_to_str t) ^ "}"
     | End -> "End"
     | Op(t) -> "Op{" ^ (atype_to_str t) ^ "}"
     | Num -> "Num"
@@ -187,6 +189,7 @@ let rec initial_beta (first : abstract_type) (second : any_type) (state : state)
     (abstract_type * (extnum * extnum -> extnum) * (value * value -> value * printable_type list * state)) =
     match first, second with
     | Gobble,   (AType(_) | PType(_)) -> (None, fst, fun _ -> (None, [], state))
+    | Match s,  AType t -> if t = s then (None, fst, fun _ -> (None, [], state)) else raise (Invalid_argument "Matched wrong abstract type")
     | s,        AType(End) -> (s, minfty, fun (u,v) -> (u, [], state))
     | s,        AType(Op None) -> (Op(s), snd, fun (v, PreOpVal(f)) -> (OpVal(v,f), [], state))
     | Op s,     AType(Op t) -> if s = t then (Op(s), snd, (fun (OpVal(v,f),OpVal(u,g)) -> (OpVal(f(v,u),g), [], state))) else raise (Failure "s not t")
@@ -215,7 +218,7 @@ let rec initial_beta (first : abstract_type) (second : any_type) (state : state)
     | Let, AType Index -> (Let, fst, fun (LetVal (x,l), NumVal n) -> LetVal (x, l @ [int_of_float n]), [], state)
     | Leteq, AType s -> (None, fst, fun (LetVal (x,l), v) -> None, [], state#alter (let_new_state state s x v l))
     (* *)
-    | Primitive, None -> (Gobble, fst, fun (PrimVal f,_) -> let new_val = f (state#valuate "_reg_in") in (None, [], (state#alterval "_reg_out" new_val)))
+    | Primitive, None -> (Match End, fst, fun (PrimVal f,_) -> let new_val = f (state#valuate "_reg_in") in (None, [], (state#alterval "_reg_out" new_val)))
 ;;
 
 let first3 = fun (a,b,c) -> a;;
