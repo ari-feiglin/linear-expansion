@@ -15,9 +15,15 @@ type abstract_type =
     | Period
     | Index
     | Let
+    | Letvar
     | Leteq
     | Equal
     | Primitive
+    | Comma of (abstract_type list)
+    | ListRparen of (abstract_type list)
+    | Product of (abstract_type list)
+    | Lbrace
+    | Rbrace
 ;;
 
 let rec atype_to_str t =
@@ -36,9 +42,15 @@ let rec atype_to_str t =
     | Period -> "Period"
     | Index -> "Index"
     | Let -> "Let"
+    | Letvar -> "Letvar"
     | Leteq -> "Leteq"
     | Equal -> "Equal"
     | Primitive -> "Primitive"
+    | Comma l -> "Comma{" ^ (List.fold_left (fun acc x -> (acc ^ (atype_to_str x) ^ " ")) "" l) ^ "}"
+    | ListRparen l -> "Rparen{" ^ (List.fold_left (fun acc x -> (acc ^ (atype_to_str x) ^ " ")) "" l) ^ "}"
+    | Product l -> "Product{" ^ (List.fold_left (fun acc x -> (acc ^ (atype_to_str x) ^ " ")) "" l) ^ "}"
+    | Lbrace -> "Lbrace"
+    | Rbrace -> "Rbrace"
 ;;
 
 type value =
@@ -57,11 +69,7 @@ let rec value_to_str v =
     | NumVal(f) -> Float.to_string f
     | PreOpVal(f) -> "fun"
     | OpVal(v,f) -> (value_to_str v) ^ " fun"
-    | ListVal(l) -> (
-        match l with
-        | [] -> ""
-        | x :: l -> (value_to_str x) ^ "," ^ (value_to_str (ListVal l))
-    )
+    | ListVal(l) -> (List.fold_left (fun acc x -> acc ^ (value_to_str x) ^ ", ") "[" l) ^ "]"
     | LetVal (v,l) -> v ^ (List.fold_left (fun acc x -> acc ^ " " ^ (string_of_int x)) "" l)
     | PrimVal _ -> "prim"
 ;;
@@ -121,7 +129,8 @@ class state =
     object(self)
         val mutable pstate_stack = ([] : partial_state list)
         method push pstate =
-            pstate_stack <- pstate :: pstate_stack
+            pstate_stack <- pstate :: pstate_stack;
+            self
         method pop =
             match pstate_stack with
             | [] -> raise (Failure("Empty State stack"))
@@ -196,8 +205,6 @@ let rec initial_beta (first : abstract_type) (second : any_type) (state : state)
     | Op s,     AType(Rparen t) -> if s = t then (Rparen(s), snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
     | s,        AType(Rparen None) -> (Rparen(s), snd, fun (u,_) -> (u, [], state))
     | Lparen,   AType(Rparen s) -> (s, fst, fun (_,u) -> (u, [], state))
-    (* Very vague match, keep last *)
-    | Op s,     AType(t) -> if s = t then (s, snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
     (* *)
     | Lbrack(None), AType(s) -> (
         match s with
@@ -209,16 +216,23 @@ let rec initial_beta (first : abstract_type) (second : any_type) (state : state)
     | Period, AType(Num) -> (Index, zero, fun (_,n) -> n, [], state)
     | List(s), AType Index -> (s, fst, fun (l, NumVal n) -> index_list l (int_of_float n), [], state)
     (* Note changes to let stuff *)
-    | Let, PType x -> (
-        match x with
-        | "=" -> (Leteq, minfty, fun (x,_) -> x, [], state)
-        | "." -> raise (Failure "Cannot match let with .")
-        | _ ->(Let, snd, fun (_,_) -> LetVal (x, []), [], state)
-    )
-    | Let, AType Index -> (Let, fst, fun (LetVal (x,l), NumVal n) -> LetVal (x, l @ [int_of_float n]), [], state)
+    | Let, PType x -> (Letvar, fst, fun _ -> LetVal(x, []), [], state)
+    | Letvar, AType Index -> (Letvar, fst, fun (LetVal (x,l), NumVal n) -> LetVal (x, l @ [int_of_float n]), [], state)
+    | Letvar, AType Equal -> (Leteq, minfty, fun (v,_) -> v, [], state)
     | Leteq, AType s -> (None, fst, fun (LetVal (x,l), v) -> None, [], state#alter (let_new_state state s x v l))
     (* *)
+    | Lbrace, None -> (None, fst, fun _ -> None, [], state#push (fun _ -> raise (Failure "End of state")))
+    | Rbrace, None -> (None, fst, fun _ -> None, [], (state#pop; state))
+    (* *)
     | Primitive, None -> (Match End, fst, fun (PrimVal f,_) -> let new_val = f (state#valuate "_reg_in") in (None, [], (state#alterval "_reg_out" new_val)))
+    (* *)
+    | s, AType(Comma []) -> (Comma [s], snd, fun (u,_) -> ListVal [u], [], state)
+    | Op s, AType(Comma [t]) -> if s=t then (Comma [s], snd, fun (OpVal (u,f),ListVal[v]) -> ListVal [f(u,v)], [], state) else raise (Failure "Cannot match s and t")
+    | Comma l, AType(Comma [s]) -> (Comma (l @ [s]), snd, fun (ListVal l,ListVal m) -> ListVal (l@m), [], state)
+    | Comma l, AType(Rparen s) -> (ListRparen (l @ [s]), snd, fun (ListVal l,v) -> ListVal (l @ [v]), [], state)
+    | Lparen, AType (ListRparen l) -> (Product l, infty, fun (_,l) -> l, [], state)
+    (* Very vague match, keep last *)
+    | Op s,     AType(t) -> if s = t then (s, snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
 ;;
 
 let first3 = fun (a,b,c) -> a;;
@@ -229,7 +243,8 @@ let initial_priority s =
     try int_of_string s; new extnum 0 true
     with Failure _ -> (
         match s with
-        | ";" -> new extnum 0 false
+        | ";" -> new extnum (-1) true
+        | "=" -> new extnum (-1) true
         | "(" -> new extnum 0 true
         | ")" -> new extnum 0 false
         | "+" -> new extnum 1 false
@@ -239,6 +254,9 @@ let initial_priority s =
         | "[" -> new extnum 0 false
         | "]" -> new extnum 0 false
         | "." -> new extnum 0 true
+        | "," -> new extnum 0 false
+        | "{" -> new extnum 0 false
+        | "}" -> new extnum 0 false
         | _ -> new extnum 0 true
     )
 ;;
@@ -360,6 +378,9 @@ let initial_state = fun x ->
         | "let" -> (Let, None)
         | "=" -> (Equal, None)
         | "print" -> (Primitive, PrimVal (fun (a,v) -> (print_endline (value_to_str v); (None, None))))
+        | "," -> (Comma [], None)
+        | "{" -> (Lbrace, None)
+        | "}" -> (Rbrace, None)
     )
 ;;
 

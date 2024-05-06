@@ -9,6 +9,8 @@ type toktype =
     | Comma
     | Lbrack
     | Rbrack
+    | Lbrace
+    | Rbrace
 ;;
 
 let ttype_to_str t =
@@ -23,6 +25,8 @@ let ttype_to_str t =
     | Comma -> "comma"
     | Lbrack -> "["
     | Rbrack -> "]"
+    | Lbrace -> "{"
+    | Rbrace -> "}"
 ;;
 
 let ttype_lst_to_str lst = List.fold_left (fun acc t -> acc ^ (ttype_to_str t) ^ ", ") "" lst;;
@@ -38,6 +42,8 @@ let toktypes : (toktype list) CharMap.t = CharMap.of_seq @@ List.to_seq [
     (')',  [Rparen]);
     ('[',  [Lbrack]);
     (']',  [Rbrack]);
+    ('{',  [Lbrace]);
+    ('}',  [Rbrace]);
     ('.',  [Op; Num]);
     (',',  [Comma]);
 ];;
@@ -55,6 +61,8 @@ let independent_toktypes = ttype_set_from_list [
     Rparen;
     Lbrack;
     Rbrack;
+    Lbrace;
+    Rbrace;
     End;
     Comma;
 ];;
