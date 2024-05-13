@@ -70,11 +70,12 @@ let rec atype_to_str t =
 ;;
 
 type closure = {
-    plist : printable_type list;
+    plist : value;
     code : printable_type list;
-};;
+    mutable state : state;
+}
 
-type value =
+and value =
     | None
     | NumVal of float
     | PreOpVal of ((value * value) -> value)
@@ -85,7 +86,19 @@ type value =
     | VarNameVal of printable_type
     | CodeVal of printable_type list
     | FunVal of printable_type * value
-;;
+    | ClosureVal of closure
+
+and abstract_value = abstract_type * value
+
+and partial_state = printable_type -> abstract_value
+
+and state = <
+    push : (partial_state -> state);
+    pop : partial_state;
+    alter : (partial_state -> state);
+    alterval : (printable_type -> abstract_value -> state);
+    valuate : (printable_type -> abstract_value);
+>;;
 
 let rec value_to_str v =
     match v with
@@ -99,9 +112,9 @@ let rec value_to_str v =
     | VarNameVal s -> s
     | CodeVal l -> List.fold_left (fun acc x -> acc ^ " " ^ x) "" l
     | FunVal (x, v) -> x ^ ", " ^ (value_to_str v)
+    | ClosureVal c -> "<" ^ (value_to_str (c.plist)) ^ ", code, state>"
 ;;
 
-type abstract_value = abstract_type * value;;
 
 type any_type =
     | AType of abstract_type
@@ -140,42 +153,6 @@ type token =
 let zero = fun (n,m) -> new extnum 0 false;;
 let infty = fun (n,m) -> new extnum 0 true;;
 let minfty = fun (n,m) -> new extnum (-1) true;;
-
-type partial_state = printable_type -> abstract_value;;
-
-let rec valuate_stack stack (x : printable_type) : abstract_value =
-    match stack with
-    | [] -> raise (Failure ("value does not exist in stack"))
-    | t :: stack -> (
-        try t(x) with
-        | Failure(_) -> valuate_stack stack x
-    )
-;;
-
-class state =
-    object(self)
-        val mutable pstate_stack = ([] : partial_state list)
-        method push pstate =
-            pstate_stack <- pstate :: pstate_stack;
-            self
-        method pop =
-            match pstate_stack with
-            | [] -> raise (Failure("Empty State stack"))
-            | s :: t -> pstate_stack <- t; s
-        method alter pstate =
-            let top = self#pop in
-            let new_top = fun x -> (
-                try pstate(x) with
-                | Failure(_) -> top(x)
-            ) in
-            self#push new_top;
-            self
-        method alterval x v =
-            let pstate = fun y -> if x = y then v else raise (Failure "not defined") in
-            self#alter pstate
-        method valuate x = valuate_stack pstate_stack x
-    end
-;;
 
 exception Foo of string;;
 
@@ -220,6 +197,13 @@ let let_new_state (state : state) (s : abstract_type) (x : printable_type) (v : 
         )
 ;;
 
+let create_pstate (plist : value) vals product_type =
+    let rec helper plist vals product_type x = (
+        match plist, vals, product_type with
+        | ListVal [], _, _ -> raise (Failure "Not found")
+        | ListVal ((VarNameVal y) :: plist), ListVal (v :: vals), (t :: product_type) -> if x = y then (t,v) else helper (ListVal plist) (ListVal vals) product_type x
+    ) in helper plist vals product_type
+;;
 
 let rec initial_beta (first : abstract_type) (second : any_type) (state : state) :
     (abstract_type * (extnum * extnum -> extnum) * (value * value -> value * printable_type list * state)) =
@@ -275,10 +259,24 @@ let rec initial_beta (first : abstract_type) (second : any_type) (state : state)
         | "{" -> (AltLbrace, CodeVal [])
         | _ -> raise (Failure "")
         in
-        fun _ -> FunVal (x, None), [], state#alter pstate)
+        fun _ -> FunVal (x, None), [], state#push pstate)
     | Funname, AType Plist -> (Funvars, infty, fun (FunVal (x, None), v) -> FunVal (x,v), [], state)
+    | Funvars, AType Code -> state#pop; (None, infty, fun (FunVal (x,v), CodeVal l) -> (
+            let cval = { plist = v; code = l; state = state } in
+            cval.state <- (state#alterval x (Closure, ClosureVal cval));
+            (ClosureVal cval, [], state)
+        ))
+    | Closure, AType (Product l) -> (None, fst, fun (ClosureVal cval, k) -> (
+        let pstate = create_pstate (cval.plist) k l in
+        (None, cval.code @ ["}"], state#push pstate)
+    ))
+    | Closure, AType(x) -> (None, fst, fun (ClosureVal cval, k) -> (
+        let pstate = create_pstate (cval.plist) (ListVal ([k])) [x] in
+        (None, cval.code @ ["}"], state#push pstate)
+    ))
     (* Very vague match, keep last *)
     | Op s,     AType(t) -> if s = t then (s, snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
+    | End, None -> (None, fst, fun _ -> (None, [], state))
 ;;
 
 let first3 = fun (a,b,c) -> a;;
@@ -431,6 +429,39 @@ let initial_state = fun x ->
     )
 ;;
 
-let state = new state;;
+let rec valuate_stack stack (x : printable_type) : abstract_value =
+    match stack with
+    | [] -> raise (Failure ("value does not exist in stack"))
+    | t :: stack -> (
+        try t(x) with
+        | Failure(_) -> valuate_stack stack x
+    )
+;;
+
+let state : state = 
+    object(self)
+        val mutable pstate_stack = ([] : partial_state list)
+        method push pstate =
+            pstate_stack <- pstate :: pstate_stack;
+            self
+        method pop =
+            match pstate_stack with
+            | [] -> raise (Invalid_argument ("Empty State stack"))
+            | s :: t -> pstate_stack <- t; s
+        method alter pstate = (
+            let top = self#pop in
+            let new_top = fun x -> (
+                try pstate(x) with
+                | Failure(_) -> top(x)
+            ) in
+            self#push new_top;
+            self)
+        method alterval x v =
+            let pstate = fun y -> if x = y then v else raise (Failure "not defined") in
+            self#alter pstate
+        method valuate x = valuate_stack pstate_stack x
+    end
+;;
+
 state#push initial_state;;
 

@@ -2,7 +2,13 @@ open Lexer
 open Reducer
 
 let tokens = get_all_tokens ("
-    fun foo (x y (z w));
+    let _reg_in = 1;
+    fun print (x) {
+        let _reg_in = x;
+        _prim_print;
+    }
+    print 100;
+    _prim_print;
 ");;
 
 (*let tokens = get_all_tokens "

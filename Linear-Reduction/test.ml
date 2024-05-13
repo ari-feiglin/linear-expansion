@@ -1,8 +1,13 @@
-type linked = {
-    mutable value : int;
-    mutable next : linked option;
-}
+type state = < push : (int -> state) >
 
-let l : linked = {value = 10; next = None};;
+let x : state =
+    object(self)
+        val mutable stack = ([] : int list)
+        method push v =
+            stack <- v :: stack;
+            self
+    end
+;;
 
-l.next <- Some l;;
+x#push 0;;
+
