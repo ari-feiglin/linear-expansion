@@ -24,6 +24,14 @@ type abstract_type =
     | Product of (abstract_type list)
     | Lbrace
     | Rbrace
+    | AltLparen
+    | Plist
+    | AltLbrace
+    | Code
+    | Fun
+    | Funname
+    | Funvars
+    | Closure
 ;;
 
 let rec atype_to_str t =
@@ -51,7 +59,20 @@ let rec atype_to_str t =
     | Product l -> "Product{" ^ (List.fold_left (fun acc x -> (acc ^ (atype_to_str x) ^ " ")) "" l) ^ "}"
     | Lbrace -> "Lbrace"
     | Rbrace -> "Rbrace"
+    | AltLparen -> "AltLparen"
+    | Plist -> "Plist"
+    | AltLbrace -> "AltLbrace"
+    | Code -> "Code"
+    | Fun -> "Fun"
+    | Funname -> "Funname"
+    | Funvars -> "Funvars"
+    | Closure -> "Closure"
 ;;
+
+type closure = {
+    plist : printable_type list;
+    code : printable_type list;
+};;
 
 type value =
     | None
@@ -61,6 +82,9 @@ type value =
     | ListVal of value list
     | LetVal of printable_type * (int list)
     | PrimVal of ((abstract_type * value) -> (abstract_type * value))
+    | VarNameVal of printable_type
+    | CodeVal of printable_type list
+    | FunVal of printable_type * value
 ;;
 
 let rec value_to_str v =
@@ -72,6 +96,9 @@ let rec value_to_str v =
     | ListVal(l) -> (List.fold_left (fun acc x -> acc ^ (value_to_str x) ^ ", ") "[" l) ^ "]"
     | LetVal (v,l) -> v ^ (List.fold_left (fun acc x -> acc ^ " " ^ (string_of_int x)) "" l)
     | PrimVal _ -> "prim"
+    | VarNameVal s -> s
+    | CodeVal l -> List.fold_left (fun acc x -> acc ^ " " ^ x) "" l
+    | FunVal (x, v) -> x ^ ", " ^ (value_to_str v)
 ;;
 
 type abstract_value = abstract_type * value;;
@@ -231,6 +258,25 @@ let rec initial_beta (first : abstract_type) (second : any_type) (state : state)
     | Comma l, AType(Comma [s]) -> (Comma (l @ [s]), snd, fun (ListVal l,ListVal m) -> ListVal (l@m), [], state)
     | Comma l, AType(Rparen s) -> (ListRparen (l @ [s]), snd, fun (ListVal l,v) -> ListVal (l @ [v]), [], state)
     | Lparen, AType (ListRparen l) -> (Product l, infty, fun (_,l) -> l, [], state)
+    (* *)
+    | AltLparen, PType(")") -> (Plist, zero, fun (u,_) -> u, [], state)
+    | AltLparen, PType("(") ->  raise (Failure "matched altparen with (")
+    | AltLparen, PType(x) -> (AltLparen, snd, fun (ListVal l,_) -> ListVal (l @ [VarNameVal x]), [], state)
+    | AltLparen, AType Plist -> (AltLparen, fst, fun (ListVal l, v) -> ListVal (l @ [v]), [], state)
+    (* *)
+    | AltLbrace, PType("}") -> (Code, infty, fun (u,_) -> u, [], state)
+    | AltLbrace, PType("{") -> raise (Failure "matched altbrace with {")
+    | AltLbrace, PType(x) -> (AltLbrace, infty, fun (CodeVal l,_) -> CodeVal (l @ [x]), [], state)
+    | AltLbrace, AType(Code) -> (AltLbrace, infty, fun (CodeVal l, CodeVal h) -> CodeVal (l @ ("{" :: h @ ["}"])), [], state)
+    (* *)
+    | Fun, PType(x) -> (Funname, infty,
+        let pstate y = match y with
+        | "(" -> (AltLparen, ListVal [])
+        | "{" -> (AltLbrace, CodeVal [])
+        | _ -> raise (Failure "")
+        in
+        fun _ -> FunVal (x, None), [], state#alter pstate)
+    | Funname, AType Plist -> (Funvars, infty, fun (FunVal (x, None), v) -> FunVal (x,v), [], state)
     (* Very vague match, keep last *)
     | Op s,     AType(t) -> if s = t then (s, snd, (fun (OpVal(v,f),u) -> (f(v,u), [], state))) else raise (Failure "s not t")
 ;;
@@ -255,8 +301,8 @@ let initial_priority s =
         | "]" -> new extnum 0 false
         | "." -> new extnum 0 true
         | "," -> new extnum 0 false
-        | "{" -> new extnum 0 false
-        | "}" -> new extnum 0 false
+        | "{" -> new extnum 0 true
+        | "}" -> new extnum 0 true
         | _ -> new extnum 0 true
     )
 ;;
@@ -353,13 +399,13 @@ let rec derived_beta (str, state: token list * state) : (token list * state) =
     )
 ;;
 
-let rec total_beta (str : token list) (state : state) =
-    print_tokens (str, state);
+let rec total_beta (silent : bool) (str : token list) (state : state) =
+    if not silent then print_tokens (str, state);
     let res = derived_beta (str, state) in
     let str = fst res in
     let state = snd res in
     if str != [] then
-        total_beta str state
+        total_beta silent str state
 
 let initial_state = fun x ->
     try (Num, NumVal(Float.of_string x))
@@ -377,10 +423,11 @@ let initial_state = fun x ->
         | "." -> (Period, None)
         | "let" -> (Let, None)
         | "=" -> (Equal, None)
-        | "print" -> (Primitive, PrimVal (fun (a,v) -> (print_endline (value_to_str v); (None, None))))
+        | "_prim_print" -> (Primitive, PrimVal (fun (a,v) -> (print_endline (value_to_str v); (None, None))))
         | "," -> (Comma [], None)
         | "{" -> (Lbrace, None)
         | "}" -> (Rbrace, None)
+        | "fun" -> (Fun, None)
     )
 ;;
 

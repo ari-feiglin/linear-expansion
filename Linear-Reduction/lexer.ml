@@ -63,8 +63,8 @@ let independent_toktypes = ttype_set_from_list [
     Rbrack;
     Lbrace;
     Rbrace;
-    End;
     Comma;
+    End;
 ];;
 
 let set_toktype lst ttype toktypes = List.fold_left (fun toktypes x -> CharMap.add x ttype toktypes) toktypes lst;;
