@@ -262,199 +262,72 @@ $$ \eqalign{
 
 \subsection{Valued Reduction}
 
-Notice that in the previous examples, many symbols had values, be it a number, a list, etc.
-This leads us to the next variation of linear reduction: {\it valued} linear reduction.
-Here we start with the sets: ${\cal U}$ the universe of values, $\Sigma_P$ the set of printable types, and $\Sigma_A$ the set of abstract types.
+\noindent We define the following four base sets:
+\benum
+    \item ${\cal U}$ the universe of {\it values}, these are all the internal values an object may have.
+    \item $\term_{\cal P}$ the set of {\it printable terms}, these are the tokens which a programmer may pass to the reducer.
+    \item $\term_{\type}$ the set of {\it type terms}.
+    \item $\term_{\cal A}$ the set of {\it abstract terms}.
+\eenum
+The sets $\term_{\cal P},\term_\type,\term_{\cal A}$ are all disjoint, we place no such restriction on ${\cal U}$ as the purpose it serves is different.
+Let ${\cal A}$ be a set of {\it atomic abstract terms}, then the construction of abstract terms is
+$$ \term_{\cal A} \ccoloneqq {\cal A}\mid{\cal A}\term_\type $$
+And let $\type$ be a set of {\it atomic types}, each with an associated arity, which may be $\infty$.
+Let $\type^n$ be the set of atomic types of arity $n$, then the construction of type terms is
+$$ \term_\type \ccoloneqq \type^0 \mid \type^n\term_\type^1\cdots\term_\type^n\mid\type^\infty\term_\type^1\cdots\term_\type^n $$
+as $n$ ranges over all ${\bb N}_{>0}$.
 
-Here ${\cal U}$ is some arbitrary set, it will contain of all possible values (numbers, lists, strings, functions, etc.) in our program.
-$\Sigma_P$ and $\Sigma_A$ are sets of symbols which we call {\it types}.
-
-Let us further define $\Pi_A\coloneqq\Sigma_A\times\U$ to be the set of {\it abstract values}, $\Sigma\coloneqq\Sigma_P\cup\Sigma_A$ the set of types, and $\Pi=\Sigma_P\cup\Pi_A$ the set of {\it values}
-(printable types are also values).
-Elements of $\overline\Pi$ will be written like $\sigma_n(v)$ where $\sigma$ is the type, $n$ the priority, and $v$ the value (nothing for printable types).
-
-Let us define a point-state, similar to stateful reductions, as partial functions from $\Sigma_P$ to $\Pi_A$.
-Then a state is defined as a sequence of point-states similar to before.
+Define
+\benum
+    \item $\term\coloneqq\term_{\cal P}\cup\term_\type\cup\term_{\cal A}$ the set of {\it basic terms}.
+    \item $\term_{\cal I}\coloneqq\term_\type\cup\term_{\cal A}$ the set of {\it internal terms}.
+    \item $\Pi_{\cal I}\coloneqq\term_{\cal I}\times{\cal U}$ the set of {\it termed values}.
+    \item $\Pi\coloneqq\Pi_{\cal I}\cup\term_{\cal P}$ the set of {\it atomic expressions}.
+\eenum
+Elements of $\overline\Pi$ will be written like $\sigma_n(v)$ where $\sigma$ is the term, $n$ the priority, and $v$ the value (nothing for printable terms).
 
 In valued reduction, we abstract away some inputs to the initial beta-reducer in order to allow for easier implementation.
 An initial beta-reducer is a partial function
-$$ \hat\beta\colon \Sigma_A\times\Sigma_\epsilon\times{\rm State}\plongto\Sigma_A^\epsilon\times(\overline{\bb Z}\times\overline{\bb Z}\to\overline{\bb Z})\times
-({\cal U}\times{\cal U}\pto{\cal U}\times\Sigma_P^*\times{\rm State}) $$
+$$ \varwidehat\beta\colon \term_{\cal I}\times\term^\epsilon\plongto\term_{\cal I}^\epsilon\times(\overline{\bb Z}\times\overline{\bb Z}\to\overline{\bb Z})\times
+({\cal U}\times{\cal U}\times{\rm State}\pto{\cal U}\times\term_{\cal P}^*\times{\rm State}) $$
 
 We extend this to a derived $\beta$-reducer,
 $$ \beta\colon\overline\Pi^*\times{\rm State}\plongto\overline\Pi^*\times{\rm State} $$
 with the following rules: given an input $\gen{\xi}[s]$ its image is
 \benum
-    \item If $\xi=\sigma_n\xi'$ for $\sigma\in\Sigma_p$ then
+    \item If $\xi=\sigma_n\xi'$ for $\sigma\in\term_{\cal P}$ then
         $$ \beta\gen{\xi}[s] = \gen{s(\sigma)_n\xi'}[s] . $$
-    \item If $\xi=\sigma_i(v)\xi'$ and $\hat\beta(\sigma,\epsilon,s)=(\alpha,\rho,f)$ is defined, then if $f(v)=(w,\omega,s')$ and $\rho(i)=k$ then
-        $$ \beta\gen{\xi}[s] = \gen{\alpha_k(w)\pi(\omega)\xi'}[s'] . $$
-    \item If $\xi=\sigma_i(v)\tau_j(u)\xi'$ and $i\geq j$ and $\hat\beta(\sigma,\tau,s)=(\alpha,\rho,f)$ is defined, then if $f(v,u)=(w,\omega,s')$ and $\rho(i,j)=k$ then
-        $$ \beta\gen{\xi}[s] = \gen{\alpha_k(w)\pi(\omega)\xi'}[s] . $$
+    \item If $\xi=\sigma_i(v)\xi'$ and $\hat\beta(\sigma,\epsilon)=(\alpha,\rho,f)$ is defined, then if $f(v,\_,s)=(w,\zeta,s')$ and $\rho(i)=k$ then
+        $$ \beta\gen{\xi}[s] = \gen{\alpha_k(w)\pi(\zeta)\xi'}[s'] . $$
+    \item If $\xi=\sigma_i(v)\tau_j(u)\xi'$ and $i\geq j$ and $\hat\beta(\sigma,\tau)=(\alpha,\rho,f)$ is defined, then if $f(v,u,s)=(w,\zeta,s')$ and $\rho(i,j)=k$ then
+        $$ \beta\gen{\xi}[s] = \gen{\alpha_k(w)\pi(\zeta)\xi'}[s] . $$
     \item Otherwise, if $\xi=\sigma_i(v)\xi'$ and $\beta\gen{\xi'}[s]=\gen{\xi''}[s']$,
         $$ \beta\gen{\xi}[s] = \gen{\sigma_i(v)\xi''}[s'] . $$
 \eenum
 
 \subsubsection{States}
 
-Similar to before, we define point-states as partial maps $\Sigma_P\plongto\Pi_A$.
-And if $s_1,s_2$ are two point-states and $\sigma\in\Sigma_P$ then
+Similar to before, we define point-states as partial maps $\term_{\cal P}\plongto\Pi_{\cal I}$.
+And if $s_1,s_2$ are two point-states and $\sigma\in\term_{\cal P}$ then
 $$ s_1s_2(\sigma) = \cases{s_2(\sigma) & $\sigma\in{\rm dom}s_2$\cr s_1(\sigma) & $\sigma\in{\rm dom}s_1$} $$
 We will denote finite point states as $[\sigma_1\mapsto\varkappa_1,\dots,\sigma_n\mapsto\varkappa_n]$, and this denotes the point-state which maps $\sigma_i$ to $\varkappa_i$.
-Then we define a state to be a sequence of point-states.
-For a state $\bar s=(s_1,\dots,s_n)$, let us define
+
+A state will now have two fields: a sequence of point-states, as well as a sequence of indexes.
+For a state $\bar s=\bigl[(s_1,\dots,s_n),I=(i_1,\dots,i_k)\bigr]$, let us define
 \benum
-    \item $\bar s+s=(s_1,\dots,s_n,s)$
-    \item $\pop\bar s=(s_1,\dots,s_{n-1})$
-    \item $\bar ss=(s_1,\dots,s_ns)$
+    \item $\bar s+s=\bigl[(s_1,\dots,s_n,s),I\bigr]$
+    \item $\bar s+_cs=\bigl[(s_1,\dots,s_n,s),(i_1,\dots,i_k,n+1)\bigr]$
+    \item $\pop\bar s=\bigl[(s_1,\dots,s_{n-1}),I\bigr]$ if $i_k<n$ otherwise, $\bigl[(s_1,\dots,s_{n-1},(i_1,\dots,i_{k-1})\bigr]$
+    \item $\bar ss=\bigl[(s_1,\dots,s_ns),I\bigr]$
     \item $\bar s(\sigma)=s_1\cdots s_n(\sigma)$ for $\sigma\in\Sigma_P$
 \eenum
-Furthermore, if $\sigma\in\Sigma_P$ and $\varkappa\in\Pi_A$ let us define $\bar s\{\sigma\mapsto\varkappa\}$ as $(s_1,\dots,s_i[\sigma\mapsto\varkappa],\dots,s_n)$ where $i$ is the maximum index such that
-$\sigma\in{\rm dom}s_i$.
+Furthermore, if $\sigma\in\term_{\cal P}$ and $\varkappa\in\Pi_{\cal I}$ let us define $\bar s\{\sigma\mapsto\varkappa\}$ as $(s_1,\dots,s_i[\sigma\mapsto\varkappa],\dots,s_n)$ where $i$ is the maximum
+index such that $\sigma\in{\rm dom}s_i$.
 
 \subsubsection{The Initial Beta Reducer}
 
-We will now construct the initial $\beta$-reducer for our programming language.
-By convention, {\astyle abstract types} will be colored red.
-
-\noindent{\bf Matching:}
-We add abstract types $\gbble,\eend$ and the ``compound'' abstract type $\asig\match$ with the initial reduction rule
-\benum
-    \item $\asig\match\ \asig\ s\longto \epsilon \fst\ (\to \epsilon,\epsilon,s)$
-    \item $\gbble\ \asig\ s\longto \epsilon\ \fst\ (\to\epsilon,\epsilon,s)$
-    \item ${\astyle\sigma}\ \eend\ s \longto \sigma\ {\sf minfty}\ (u\to u)$
-\eenum
-Where $\fst,\snd$ are the first and second projection maps respectively, and ${\sf minfty}$ is the constant map equal to $-\infty$.
-
-\noindent{\bf Arithmetic:}
-For each abstract type $\asig$ we define the ``compound'' abstract type $\asig\op$ with rules:
-\blist
-    \item $\asig\ \op\ s \longto \asig\op\ \snd\ \bigl(v,f\to(v,f),\epsilon,s\bigr)$
-    \item $\asig\op\ \asig\op\ s\longto \asig\op\ \snd\ \bigl((v,f),(u,g)\to(f(v,u),g),\epsilon,s\bigr)$
-    \item $\asig\op\ \asig\ s\longto \asig\ \snd\ \bigl((v,f),u\longto f(v,u),\epsilon,s\bigr)$
-\elist
-Where ${\sf zero}$ is the constant zero map.
-Notice that here things of the form $(n,f)$ etc. are {\it values} (which are just arbitrary).
-We further define the abstract types $\num$ and $\str$.
-These abstract types we have just defined allow for basic arithmetic:
-$$ \eqalign{
-    \num_\infty(1) \op_1(+) \num_\infty(2) \op_2(\cdot) \num_\infty(3)\eend_{-infty} &\longto \num\op_1(1,+)\num_\infty(2)\op_2(\cdot)\num_\infty(3)\eend_{-infty}\cr
-    &\longto \num\op_1(1,+)\num\op_2(2,\cdot)\num_\infty(3)\eend_{-infty}\cr
-    &\longto \num\op_1(1,+)\num\op_2(2,\cdot)\num_{-\infty}(3)\cr
-    &\longto \num\op_1(1,+)\num_{-\infty}(6)\cr
-    &\longto \num_{-\infty}(7)
-} $$
-
-We further define $\lparen$ and $\rparen$, as well as the compound type $\asig\rparen$ as follows:
-\blist
-    \item $\asig\ \rparen\ s\longto \asig\rparen\ \snd\ \bigl(n\to n,\epsilon,s\bigr)$
-    \item $\asig\op\ \asig\rparen\ s\longto \asig\rparen\ \snd\ \bigl((f,n),m\to f(n,m),\epsilon,s\bigr)$
-    \item $\lparen\ \asig\rparen\ s\longto \asig\ \fst\ \bigl(n\to n,\epsilon,s\bigr)$
-\elist
-
-\noindent{\bf Lists:}
-We add $\lbrack$, $\rbrack$, the compound type $\asig\lbrack$, the compound type $\asig\list$, $\period$, and $\index$:
-\blist
-    \item $\lbrack\ {\astyle\sigma}\ s\longto \asig\lbrack\ \fst\ \bigl(u\to(u),\epsilon,s\bigr)$ for ${\astyle\sigma}\neq\lbrack,\rbrack$
-    \item $\asig\lbrack\ {\astyle\sigma}\ s\longto \asig\lbrack\ \fst\ \bigl(\ell,u\to(\ell,\sigma(u)),\epsilon,s\bigr)$ for ${\astyle\sigma}\neq\lbrack,\rbrack$
-    \item $\asig\lbrack\ \rbrack\ s\longto \asig\list\ {\sf infty}\ \bigl(\ell\to\ell,\epsilon,s\bigr)$
-    \item $\period\ \num\ s\longto \index\ {\sf zero}\ \bigl(n\to n,\epsilon,s\bigr)$
-    \item $\asig\list\ \index\ s\longto \asig\ \fst\ \bigl((v_0,\dots,v_n),i\to v_i,\epsilon,s\bigr)$
-\elist
-So for example $[1+2;2;]$ will be converted to (really this is misleading, since the printable tokens aren't converted into abstract tokens before parsing, but rather during it.
-The following example is just to give some intuition)
-\lmultlines{
-    \lbrack_0 \num_\infty(1) \op_1(+) \num_\infty(2)\eend_{-infty} \num_\infty(2)\eend_{-infty} \rbrack_0\cr
-    &\longto \lbrack_0 \num\op_1(1,+) \num_\infty(2)\eend_{-infty} \num_\infty(2)\eend_{-infty}\rbrack_0\cr
-    &\longto \lbrack_0 \num\op_1(1,+) \num_{-\infty}(2) \num_\infty(2) \eend_{-infty}\rbrack_0\cr
-    &\longto \lbrack_0 \num_{-\infty}(3) \num_\infty(2) \eend_{-infty}\rbrack_0\cr
-    &\longto \num\lbrack_0(3) \num_\infty(2)\eend_{-infty}\rbrack_0\cr
-    &\longto \num\lbrack_0(3) \num_{-\infty}(2)\rbrack_0\cr
-    &\longto \num\lbrack_0(3,2)\rbrack_0\cr
-    &\longto \num\list_\infty(3,2)\cr
-}
-And
-$$ \eqalign{
-    \num\list_\infty(0,1,2,3,4)\period_\infty\num_\infty(2) &\longto \num\list_\infty(0,1,2,3,4)\index_0(2)\cr
-    &\longto\num_\infty(2)
-} $$
-
-\noindent{\bf Variables:}
-We add $\lett$, $\leteq$, $\sett$, $\seteq$, and $\equal$,
-\blist
-    \item $\lett\ x\ s\longto \letvar\ \snd\ \bigl(\to (x,\varnothing),\epsilon,s\bigr)$
-    \item $\letvar\ \index\ s\longto \letvar\ \fst\ \bigl((x,\ell),n\to(x,(\ell,n)),\epsilon,s\bigr)$
-    \item $\letvar\ \equal\ s\longto \leteq\ {\sf minfty}\ \bigl((x,\ell)\to (x,\ell),\epsilon,s\bigr)$
-    \item $\leteq\ {\astyle\sigma}\ s\longto \epsilon\ \fst\ \bigl((x,\ell),v\to \epsilon,\epsilon,s'\bigr)$ where $s'$ is $s[x\mapsto\sigma(v)]$ if $\ell=\varnothing$ otherwise if $\ell=(i_1,\dots,i_n)$
-        then let $\varkappa$ be $s(x)$ where $s(x).i_1\dots i_n$ is set to be $v$, then $s'=s[x\mapsto\varkappa]$.
-    \item $\sett\ x\ s\longto \setvar\ \snd\ \bigl(\to (x,\varnothing),\epsilon,s\bigr)$
-    \item $\setvar\ \index\ s\longto \setvar\ \fst\ \bigl((x,\ell),n\to(x,(\ell,n)),\epsilon,s\bigr)$
-    \item $\setvar\ \equal\ s\longto \seteq\ {\sf minfty}\ \bigl((x,\ell)\to(x,\ell),\epsilon,s\bigr)$
-    \item $\seteq\ {\astyle\sigma}\ s\longto \epsilon\ \fst\ \bigl((x,\ell),v\to \epsilon,\epsilon,s'\bigr)$ where $s'$ is $s[x\mapsto v]$ if $\ell$ is empty and otherwise if $\ell=(i_1,\dots,i_n)$ then
-        let $\varkappa$ be $s(x)$ where $s(x).i_1.i_2\dots i_n$ is swapped with $v$, and $s'$ is $s\{x\mapsto\varkappa\}$.
-\elist
-For example
-$$ \eqalign{
-    \lett_\infty x_\infty \equal_{-\infty} \num_\infty(2)\eend_{-infty} & \longto \letvar_\infty(x) \equal_{-\infty} \num_\infty(2)\eend_{-infty}\cr
-    &\longto \leteq_{-\infty}(x) \num_\infty(2)\eend_{-infty}\cr
-    &\longto \leteq_{-\infty}(x) \num_{-\infty}(2)\cr
-    &\longto \epsilon\cr
-} $$
-and the state will have changed to $s[x\mapsto\num(2)]$.
-And if $s$ is a state where $x\mapsto\num\list(0,1)$ then
-$$ \eqalign{
-    \lett_\infty x_\infty \period_\infty \num_\infty(1) \equal_{-\infty} \num_\infty(2) &\longto \letvar_\infty(x) \period_\infty \num_\infty(1) \equal_{-\infty} \num_\infty(2)\eend_{-infty}\cr
-    &\longto \letvar_\infty(x) \index_0(1) \equal_{-\infty} \num_\infty(2)\eend_{-infty}\cr
-    &\longto \letvar_\infty(x,(1)) \equal_{-\infty} \num_\infty(2)\eend_{-infty}\cr
-    &\longto \leteq_{-\infty}(x,(1)) \num_\infty(2)\eend_{-infty}\cr
-    &\longto \leteq_{-\infty}(x,(1)) \num_{-\infty}(2)\cr
-    &\longto \epsilon\cr
-} $$
-and the state will have changed to $s[x\mapsto\num\list(0,2)]$.
-
-\noindent{\bf Scoping:}
-We add $\lbrace$ and $\rbrace$:
-\blist
-    \item $\lbrace\ \epsilon\ s\longto \epsilon\ \varnothing\ \bigl(\to \epsilon,\epsilon,s+\varnothing\bigr)$
-    \item $\rbrace\ \epsilon\ s\longto \epsilon\ \varnothing\ \bigl(\to \epsilon,\epsilon,\pop s\bigr)$
-\elist
-This highlights another difference between $\lett$ and $\sett$: $\lett$ creates a new variable in the current scope, and $\sett$ alters an existing variable in the scope for which it is defined.
-This is like doing {\tt int x = 0} vs {\tt x = 0} in C.
-
-\noindent{\bf Products}
-We add the compound type $\aOmeg\product,\aOmeg\comma,\aOmeg\rparen$ where $\aOmeg$ is a list of abstract types.
-\blist
-    \item $\asig\ \comma\ s\longto [\asig]\comma\ \snd\ (u\to [u],\epsilon,s)$
-    \item $\asig\op\ [\asig]\comma\ s\longto [\asig]\comma\ \snd\ ((f,u),[v]\to f(u,v), \epsilon,s)$
-    \item $\aOmeg\comma\ [\asig]\comma\ s\longto \aOmeg @[\asig]\comma\ \snd(\ell,\ell'\to\ell @\ell',\epsilon,s)$
-    \item $\aOmeg\comma\ \asig\rparen\ s\longto \aOmeg @[\asig]\rparen\ \snd(\ell,v\to\ell @[v],\epsilon,s)$
-    \item $\lparen\ \aOmeg\rparen\ s\longto \aOmeg\product\ {\sf infty}\ (\ell\to\ell,\epsilon,s)$
-\elist
-
-\noindent{\bf Functions:}
-First we need a way of capturing the input variable list for a function.
-To do so, we add ``alternative'' the alternative abstract type $\lparen\a$ as well as $\fun,\fun\a$ and $\plist$ (parameter list).
-\blist
-    \item $\fun\ x\ s\longto \fun\a\ \fst\ \bigl(\to x,\epsilon,s+[\{\mapsto\lbrace\a,\}\mapsto\rbrace\a,(\mapsto\lparen\a,)\mapsto\rparen\a]\bigr)$
-    \item $\lparen\a\ x\ s\longto \lparen\a\ \fst\ \bigl(\ell\to(\ell,x),\epsilon,s\bigr)$ for $x\neq)$
-    \item $\lparen\a\ )\ s\longto \plist\ \fst\ \bigl(\ell\to\ell,\epsilon,s\bigr)$
-    \item $\fun\a\ \plist\ s\longto\fun\a\ \fst\ \bigl(x,\ell\to (x,\ell),\epsilon,s\bigr)$
-\elist
-\noindent Next we need to capture the code for the function.
-Again we add an alternative type $\lbrace\a$ and $\code$.
-\blist
-    \item $\lbrace\a\ x\ s\longto \lbrace\a\ \fst\ \bigl(\quote\xi\to\quote{\xi x},\epsilon,s\bigr)$ for $x\neq\{,\}$
-    \item $\lbrace\a\ \}\ s\longto \code\ \fst\ \bigl(\quote\xi\to\quote{\{\xi\}},\epsilon,s\bigr)$
-    \item $\lbrace\a\ \code\ s\longto \lbrace\a\ \fst\ \bigl(\quote\xi,\quote{\xi'}\to\quote{\xi\xi'},\epsilon,s\bigr)$
-\elist
-\noindent Now we convert $\fun\a$ and $\code$ to a $\closure$
-\blist
-    \item $\fun\a\ \code\ s\longto \closure\ \fst\ \bigl((x,\ell),\quote\xi\to C=\gen{\ell,\quote\xi,\pop s[x\mapsto\closure(C)]},\pop s[x\mapsto\closure(C)]\bigr)$
-\elist
-\noindent And now we add rules for calling a function
-\blist
-    \item $\closure\ \list\ s\longto \epsilon\ \varnothing\ \bigl(\gen{\ell,\quote{\{\xi\}},s},\ell'\to \epsilon,\xi\},s+[\ell\mapsto\ell']\bigr)$
-\elist
+We now describe the initial beta reducer.
+By convention, {\astyle abstract terms} will be red, and {\tstyle type terms} will be green.
 
 \bye
 
