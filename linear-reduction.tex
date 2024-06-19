@@ -353,10 +353,20 @@ By convention, {\astyle atomic abstract terms} will be red, {\tstyle type terms}
     \item $\list\tsig\ \index \longto \tsig\ \fst\ (\ell,i,s\to \ell_i,\epsilon,s)$
 \elist
 
-%\noindent{\bf Variables}:
-%\blist
-%    \item $\let\ x \longto \letvar\ \snd\ (\_,\_,s\to
-%\elist
+\noindent{\bf Variables}:
+\blist
+    \item $\lett\ x \longto \letvar\ \snd\ (\_,\_,s\to(x,\varnothing),\epsilon,s)$
+    \item $\letvar\ \index \longto \letvar\ \fst\ \bigl((x,\ell),n,s\to(x,(\ell,n)),\epsilon,s\bigr)$
+    \item $\letvar\ \equal \longto \leteq\ \minfty\ \bigl((x,\ell),\_,s\to(x,\ell),\epsilon,s\bigr)$
+    \item $\leteq\ \isig \longto \epsilon\ \varnothing\ \bigl((x,\ell),v,s\to\epsilon,\epsilon,s'\bigr)$ where $s'$ is $s[x\varmapsto\sigma(v)]$ if $\ell=\varnothing$ and otherwise let $t$ be the result of
+        setting $s(x).\ell_1.\dots.\ell_n$ to $v$, then $s'=s[x\varmapsto t]$.
+\elist
+
+\noindent{\bf Scoping}:
+\blist
+    \item $\lbrace\ \epsilon \longto \epsilon\ \varnothing\ (\_,\_,s\to\epsilon,\epsilon,s+\varnothing)$
+    \item $\rbrace\ \epsilon \longto \epsilon\ \varnothing\ (\_,\_,s\to\epsilon,\epsilon,\pop s)$
+\elist
 
 \bye
 
