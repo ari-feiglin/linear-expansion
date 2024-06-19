@@ -61,7 +61,8 @@ and abstract_term =
 and term =
     | None
     | PTerm of printable_term
-    | Term_I of term_i
+    | TTerm of type_term
+    | ATerm of abstract_term
 
 and term_i =
     | None
@@ -278,7 +279,14 @@ let try_initial (first : term_i) (first_val : value) (first_priority : priority)
         (initial_priorities printable_string @ tokens, new_state)
     else
         (((Pi_I (new_term, new_value), new_priority) :: (initial_priorities printable_string)) @ tokens, new_state)
+;;
 
+let term_i_to_term (t : term_i) : term =
+    match t with
+    | None -> None
+    | TTerm s -> TTerm s
+    | ATerm s -> ATerm s
+;;
 
 let rec derived_beta (tokens, state : pi_priority list * state) : (pi_priority list * state) =
     match tokens with
@@ -291,7 +299,7 @@ let rec derived_beta (tokens, state : pi_priority list * state) : (pi_priority l
             | [] -> raise (Failure "Can't match internal term with nothing")
             | (Pi_I (s,v), m) :: toksA -> (
                 if n#geq m then
-                    try try_initial t u n (Term_I s) v m toksA state with
+                    try try_initial t u n (term_i_to_term s) v m toksA state with
                     | Match_failure _ | Failure _ -> (
                         let next = derived_beta (toks, state) in
                         let toks = fst next in
@@ -307,7 +315,7 @@ let rec derived_beta (tokens, state : pi_priority list * state) : (pi_priority l
             | (PTerm x, m) :: toksA -> (
                 if n#geq m then
                     try try_initial t u n (PTerm x) None m toksA state with
-                    | Match_failure | Failure _ -> (
+                    | Match_failure _ | Failure _ -> (
                         let next = derived_beta (toks, state) in
                         let toks = fst next in
                         let state = snd next in
@@ -323,7 +331,16 @@ let rec derived_beta (tokens, state : pi_priority list * state) : (pi_priority l
     )
 ;;
 
-let rec total_beta (silent : bool) (str : token list) (state : state) =
+let rec print_tokens (str,state : pi_priority list * state) =
+    match str with
+    | [] -> print_endline ""
+    | (PTerm t, n) :: str -> print_string (t ^ "_" ^ (n#str) ^ " "); print_tokens (str, state)
+    | (Pi_I (TTerm t, v), n) :: str -> print_string ((tterm_to_str t) ^ "_" ^ (n#str) ^ "(" ^ (value_to_str v) ^ ") "); print_tokens (str,state)
+    | (Pi_I (ATerm t, v), n) :: str -> print_string ((aterm_to_str t) ^ "_" ^ (n#str) ^ "(" ^ (value_to_str v) ^ ") "); print_tokens (str,state)
+    | (Pi_I (None, v), n) :: str -> print_string "None "; print_tokens (str, state)
+;;
+
+let rec total_beta (silent : bool) (str : pi_priority list) (state : state) =
     if not silent then print_tokens (str, state);
     let res = derived_beta (str, state) in
     let str = fst res in
@@ -331,7 +348,7 @@ let rec total_beta (silent : bool) (str : token list) (state : state) =
     if str != [] then
         total_beta silent str state
 
-let initial_state = fun x ->
+let initial_state (x : printable_term) : pi_i =
     try (TTerm Num, NumVal(Float.of_string x))
     with Failure _ -> (
         match x with
@@ -352,6 +369,9 @@ let initial_state = fun x ->
         | "{" -> (ATerm Lbrace, None)
         | "}" -> (ATerm Rbrace, None)
         | "fun" -> (ATerm Fun, None)
+        | _ -> raise (Failure "Printable term not found in state")
     )
 ;;
 
+let state = new state;;
+state#push initial_state;;

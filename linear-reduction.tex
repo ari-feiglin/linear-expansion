@@ -317,7 +317,7 @@ For a state $\bar s=\bigl[(s_1,\dots,s_n),I=(i_1,\dots,i_k)\bigr]$, let us defin
 \benum
     \item $\bar s+s=\bigl[(s_1,\dots,s_n,s),I\bigr]$
     \item $\bar s+_cs=\bigl[(s_1,\dots,s_n,s),(i_1,\dots,i_k,n+1)\bigr]$
-    \item $\pop\bar s=\bigl[(s_1,\dots,s_{n-1}),I\bigr]$ if $i_k<n$ otherwise, $\bigl[(s_1,\dots,s_{n-1},(i_1,\dots,i_{k-1})\bigr]$
+    \item $\pop\bar s=\bigl[(s_1,\dots,s_{n-1}),I\bigr]$ if $i_k<n$ otherwise, $\bigl[(s_1,\dots,s_{n-1}),(i_1,\dots,i_{k-1})\bigr]$
     \item $\bar ss=\bigl[(s_1,\dots,s_ns),I\bigr]$
     \item $\bar s(\sigma)=s_1\cdots s_n(\sigma)$ for $\sigma\in\Sigma_P$
 \eenum
@@ -327,7 +327,36 @@ index such that $\sigma\in{\rm dom}s_i$.
 \subsubsection{The Initial Beta Reducer}
 
 We now describe the initial beta reducer.
-By convention, {\astyle abstract terms} will be red, and {\tstyle type terms} will be green.
+By convention, {\astyle atomic abstract terms} will be red, {\tstyle type terms} will be green, {\istyle internal terms} will be blue.
+
+\noindent{\bf End}:
+\blist
+    \item $\isig\ \eend \longto \isig\ \minfty\ (u,\_,s\to u,\epsilon,s)$
+\elist
+
+\noindent{\bf Arithmetic}:
+\blist
+    \item $\tsig\ \op \longto \op\tsig\ \snd\ (u,f,s\to(u,f),\epsilon,s)$
+    \item $\op\tsig\ \op\tsig \longto \op\tsig\ \snd\ \bigl((u,f),(v,g),s\to (f(u,v),g),\epsilon,s\bigr)$
+    \item $\op\tsig\ \tsig \longto \tsig\ \snd\ \bigl((u,f),v,s\to f(u,v),\epsilon,s\bigr)$
+    \item $\tsig\ \rparen \longto \rparen\tsig\ \snd\ (u,\_,s\to u,\epsilon,s)$
+    \item $\op\tsig\ \rparen\tsig \longto \rparen\tsig\ \snd\ \bigl((f,u),v,s\to f(u,v),\epsilon,s\bigr)$
+    \item $\lparen\ \rparen\tsig \longto \tsig\ \fst\ (\_,u,s\to u,\epsilon,s)$
+\elist
+
+\noindent{\bf Lists}:
+\blist
+    \item $\lbrack\ \tsig \longto \lbrack\tsig\ \fst\ (\_,u,s\to (u),\epsilon,s)$
+    \item $\lbrack\tsig\ \tsig \longto \lbrack\tsig\ \fst\ (\ell,u,s\to (\ell,u),\epsilon,s)$
+    \item $\lbrack\tsig\ \rbrack \longto \list\tsig\ \pinfty\ (\ell,\_,s\to\ell,\epsilon,s)$
+    \item $\period\ \num \longto \index\ \zero\ (\_,n,s\to n,\epsilon,s)$
+    \item $\list\tsig\ \index \longto \tsig\ \fst\ (\ell,i,s\to \ell_i,\epsilon,s)$
+\elist
+
+%\noindent{\bf Variables}:
+%\blist
+%    \item $\let\ x \longto \letvar\ \snd\ (\_,\_,s\to
+%\elist
 
 \bye
 
