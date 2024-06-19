@@ -1,7 +1,14 @@
 open Lexer
 open Reducer
 
-let tokens = get_all_tokens ("(1 + 2) * 3;");;
+let tokens = get_all_tokens ("
+let x = 3;
+{let x = [[1;]; [2;3;];];
+let x.(1).(0) = 3;
+x;
+}
+x;
+");;
 
 (*let tokens = get_all_tokens "
     let x = 1;;

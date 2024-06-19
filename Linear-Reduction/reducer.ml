@@ -197,16 +197,20 @@ class state =
         method push_closure pstate =
             closure_stack <- depth :: closure_stack;
             self#push pstate
-        method pop =
+        method pop = (
             (match pstate_stack with
             | [] -> raise (Invalid_argument "Empty state stack")
-            | ps :: stack -> pstate_stack <- stack;
+            | ps :: stack -> (pstate_stack <- stack;
                 pstate_stack <- stack;
                 depth <- depth - 1;
+            )
             );
-            (if List.hd closure_stack = depth then
-                closure_stack <- List.tl closure_stack);
+            (try (if List.hd closure_stack = depth then
+                closure_stack <- List.tl closure_stack)
+            with
+            | Failure _ -> ());
             self
+        )
         method set_top pstate =
             pstate_stack <- pstate :: (List.tl pstate_stack)
         method alter pstate =
@@ -225,6 +229,55 @@ class state =
     end
 ;;
 
+let unvaluelist v =
+    match v with
+    | ListVal l -> l
+    | _ -> raise (Invalid_argument "Cannot unvalue something which is not a list")
+;;
+
+let rec swap_list (l : value) (ns : int list) (x : value) =
+    match l, ns with
+    | _, [] -> x
+    | ListVal [], _ -> raise (Invalid_argument "Cannot give an empty list")
+    | ListVal (k :: l), t :: ns -> (
+        if t = 0 then
+            ListVal ((swap_list k ns x) :: l)
+        else
+            ListVal (k :: (unvaluelist (swap_list (ListVal l) ((t - 1) :: ns) x)))
+    )
+;;
+
+let let_new_state (state : state) (s : term_i) (x : printable_term) (v : value) (ns : int list) : partial_state =
+    if s = None then raise (Failure "Cannot put None value in state")
+    else if ns = [] then
+        fun y -> (
+            if y = x then (s, v)
+            else raise (Failure "not defined")
+        )
+    else
+        let old_val = state#valuate x in
+        let kappa = snd old_val in
+        let new_kappa = swap_list kappa ns v in
+        fun y -> (
+            if y = x then ((fst old_val), new_kappa)
+            else raise (Failure "not defined")
+        )
+;;
+
+let term_i_to_term (t : term_i) : term =
+    match t with
+    | None -> None
+    | TTerm s -> TTerm s
+    | ATerm s -> ATerm s
+;;
+
+let term_to_term_i (t : term) : term_i =
+    match t with
+    | None -> None
+    | TTerm s -> TTerm s
+    | ATerm s -> ATerm s
+    | PTerm s -> raise (Failure "Cannot convert printable term to term_i")
+;;
 
 let zero = fun (n,m) -> new extnum 0 false;;
 let infty = fun (n,m) -> new extnum 0 true;;
@@ -257,6 +310,25 @@ let rec initial_beta (first : term_i) (second : term) :
             raise (Failure "Cannot match operator with rparen of different type")
     )
     | ATerm Lparen, ATerm (Rparen sigma) -> (TTerm sigma, fst, fun (_,u,s) -> (u,[],s))
+    (* Lists *)
+    | ATerm (Lbrack None), TTerm sigma -> (ATerm (Lbrack sigma), fst, fun (_,u,s) -> (ListVal [u],[],s))
+    | ATerm (Lbrack sigma), TTerm tau -> (
+        if sigma = tau then
+            (ATerm (Lbrack sigma), fst, fun (ListVal l,u,s) -> (ListVal (l @ [u]), [], s))
+        else
+            raise (Failure "Cannot match list building element with different type")
+    )
+    | ATerm (Lbrack sigma), ATerm Rbrack -> (TTerm (List sigma), infty, fun (l,_,s) -> (l, [], s))
+    | ATerm Period, TTerm Num -> (ATerm Index, zero, fun (_, n, s) -> (n, [], s))
+    | TTerm (List sigma), ATerm Index -> (TTerm sigma, fst, fun (ListVal l, NumVal i, s) -> (List.nth l (int_of_float i), [], s))
+    (* Variables *)
+    | ATerm Let, PTerm x -> (ATerm Letvar, snd, fun (_,_,s) -> (LetVal (x,[]), [], s))
+    | ATerm Letvar, ATerm Index -> (ATerm Letvar, fst, fun (LetVal (x,l), NumVal n, s) -> (LetVal (x, l@[int_of_float n]), [], s))
+    | ATerm Letvar, ATerm Equal -> (ATerm Leteq, minfty, fun (u,_,s) -> (u, [], s))
+    | ATerm Leteq, sigma -> (None, fst, fun (LetVal (x,l), u, s) -> None, [], s#alter (let_new_state s (term_to_term_i sigma) x u l))
+    (* Scoping *)
+    | ATerm Lbrace, None -> (None, fst, fun (_,_,s) -> (None, [], s#push (fun x -> raise (Failure "Empty state"))))
+    | ATerm Rbrace, None -> (None, fst, fun (_,_,s) -> (None, [], s#pop))
 ;;
 
 type pi_priority = pi * priority;;
@@ -279,13 +351,6 @@ let try_initial (first : term_i) (first_val : value) (first_priority : priority)
         (initial_priorities printable_string @ tokens, new_state)
     else
         (((Pi_I (new_term, new_value), new_priority) :: (initial_priorities printable_string)) @ tokens, new_state)
-;;
-
-let term_i_to_term (t : term_i) : term =
-    match t with
-    | None -> None
-    | TTerm s -> TTerm s
-    | ATerm s -> ATerm s
 ;;
 
 let rec derived_beta (tokens, state : pi_priority list * state) : (pi_priority list * state) =
