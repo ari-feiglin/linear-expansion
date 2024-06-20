@@ -368,5 +368,19 @@ By convention, {\astyle atomic abstract terms} will be red, {\tstyle type terms}
     \item $\rbrace\ \epsilon \longto \epsilon\ \varnothing\ (\_,\_,s\to\epsilon,\epsilon,\pop s)$
 \elist
 
+\noindent{\bf Products}:
+\blist
+    \item $\tsig\ \comma \longto \comma(\tsig)\ \snd\ (u,\_,s\to(u),\epsilon,s)$
+    \item $\op\tsig\ \comma(\tsig) \longto \comma(\tsig)\ \snd\ ((f,u),(v)\to (f(u,v)),\epsilon,s)$
+    \item $\comma\tOmeg\ \comma(\tsig) \longto \comma(\tOmeg,\tsig)\ \snd\ (\ell,\ell',s\to(\ell,\ell'),\epsilon,s)$
+    \item $\comma\tOmeg\ \rparen\tsig \longto \listrparen(\tOmeg,\tsig)\ \snd\ (\ell,v\to (\ell,v),\epsilon,s)$
+    \item $\lparen\ \listrparen\tOmeg \longto \product\tOmeg\ \pinfty\ (\_,\ell,s\to \ell,\epsilon,s)$
+\elist
+
+\noindent{\bf Primitives}:
+\blist
+    \item $\primitive\ \isig \longto \epsilon\ \varnothing\ (f,v,s\to \epsilon,w,s')$ where $f(\isig,v)=(w,s')$ (the purpose is for $f$ to have a side effect
+\elist
+
 \bye
 
