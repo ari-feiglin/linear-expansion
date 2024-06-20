@@ -2,12 +2,8 @@ open Lexer
 open Reducer
 
 let tokens = get_all_tokens ("
-let x = 3;
-{let x = [[1;]; [2;3;];];
-let x.(1).(0) = 3;
-x;
-}
-x;
+let x = (3, (1, [1;2;3;]));
+_prim_print x;
 ");;
 
 (*let tokens = get_all_tokens "

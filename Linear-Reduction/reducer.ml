@@ -29,6 +29,7 @@ and type_term =
     | Product of (type_term list)
     | String
     | Plist
+    | Primitive
 
 and abstract_term =
     | None
@@ -46,9 +47,8 @@ and abstract_term =
     | Letvar
     | Leteq
     | Equal
-    | Primitive
     | Comma of (type_term list)
-    | ListRparen of (type_term list)
+    | Listrparen of (type_term list)
     | Lbrace
     | Rbrace
     | AltLparen
@@ -84,6 +84,7 @@ let rec tterm_to_str (t : type_term) =
     | Product l -> "Product{" ^ (List.fold_left (fun acc x -> (acc ^ (tterm_to_str x) ^ " ")) "" l) ^ "}"
     | Closure -> "Closure"
     | Plist -> "Plist"
+    | Primitive -> "Primitive"
 ;;
 
 
@@ -104,9 +105,8 @@ let aterm_to_str (t : abstract_term) =
     | Letvar -> "Letvar"
     | Leteq -> "Leteq"
     | Equal -> "Equal"
-    | Primitive -> "Primitive"
     | Comma l -> "Comma{" ^ (List.fold_left (fun acc x -> (acc ^ (tterm_to_str x) ^ " ")) "" l) ^ "}"
-    | ListRparen l -> "Rparen{" ^ (List.fold_left (fun acc x -> (acc ^ (tterm_to_str x) ^ " ")) "" l) ^ "}"
+    | Listrparen l -> "Rparen{" ^ (List.fold_left (fun acc x -> (acc ^ (tterm_to_str x) ^ " ")) "" l) ^ "}"
     | Lbrace -> "Lbrace"
     | Rbrace -> "Rbrace"
     | AltLparen -> "AltLparen"
@@ -166,6 +166,7 @@ let initial_priority s =
         | "," -> new extnum 0 false
         | "{" -> new extnum 0 true
         | "}" -> new extnum 0 true
+        | "_prim_print" -> new extnum (-1) true
         | _ -> new extnum 0 true
     )
 ;;
@@ -329,6 +330,21 @@ let rec initial_beta (first : term_i) (second : term) :
     (* Scoping *)
     | ATerm Lbrace, None -> (None, fst, fun (_,_,s) -> (None, [], s#push (fun x -> raise (Failure "Empty state"))))
     | ATerm Rbrace, None -> (None, fst, fun (_,_,s) -> (None, [], s#pop))
+    (* Products *)
+    | TTerm sigma, ATerm (Comma []) -> (ATerm (Comma [sigma]), snd, fun (u,_,s) -> (ListVal [u], [], s))
+    | ATerm (Op sigma), ATerm (Comma [tau]) -> (
+        if sigma = tau then
+            (ATerm (Comma [sigma]), snd, fun (OpVal (u,f), ListVal [v], s) -> (ListVal [f(u,v)], [], s))
+        else
+            raise (Failure "Cannot match operator of one type with comma of another")
+    )
+    | ATerm (Comma omega), ATerm (Comma [sigma]) -> (ATerm (Comma (omega @ [sigma])), snd, fun (ListVal l1, ListVal l2, s) -> (ListVal (l1 @ l2), [], s))
+    | ATerm (Comma omega), ATerm (Rparen sigma) -> (ATerm (Listrparen (omega @ [sigma])), snd, fun (ListVal l, v, s) -> (ListVal (l @ [v]), [], s))
+    | ATerm Lparen, ATerm (Listrparen omega) -> (TTerm (Product omega), infty, fun (_, ListVal l, s) -> (ListVal l, [], s))
+    (* Primitives *)
+    | TTerm Primitive, TTerm sigma -> (
+        (None, fst, fun (PrimVal f, v, s) -> (let res = f (sigma, v) in let t_i = fst res in let value = snd res in (None, [], (s#alter_var "_reg_out" (TTerm t_i, value)))))
+    )
 ;;
 
 type pi_priority = pi * priority;;
@@ -429,7 +445,7 @@ let initial_state (x : printable_term) : pi_i =
         | "." -> (ATerm Period, None)
         | "let" -> (ATerm Let, None)
         | "=" -> (ATerm Equal, None)
-        | "_prim_print" -> (ATerm Primitive, PrimVal (fun (a,v) -> (print_endline (value_to_str v); (None, None))))
+        | "_prim_print" -> (TTerm Primitive, PrimVal (fun (a,v) -> (print_endline (value_to_str v); (None, None))))
         | "," -> (ATerm (Comma []), None)
         | "{" -> (ATerm Lbrace, None)
         | "}" -> (ATerm Rbrace, None)
