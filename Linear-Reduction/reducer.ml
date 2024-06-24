@@ -28,7 +28,6 @@ and type_term =
     | Closure
     | Product of (type_term list)
     | String
-    | Plist
     | Primitive
 
 and abstract_term =
@@ -57,6 +56,7 @@ and abstract_term =
     | Fun
     | Funname
     | Funvars
+    | Plist
 
 and term =
     | None
@@ -83,7 +83,6 @@ let rec tterm_to_str (t : type_term) =
     | List(t) -> "List{" ^ (tterm_to_str t) ^ "}"
     | Product l -> "Product{" ^ (List.fold_left (fun acc x -> (acc ^ (tterm_to_str x) ^ " ")) "" l) ^ "}"
     | Closure -> "Closure"
-    | Plist -> "Plist"
     | Primitive -> "Primitive"
 ;;
 
@@ -115,6 +114,7 @@ let aterm_to_str (t : abstract_term) =
     | Fun -> "Fun"
     | Funname -> "Funname"
     | Funvars -> "Funvars"
+    | Plist -> "Plist"
 ;;
 
 let rec value_to_str v =
@@ -179,7 +179,7 @@ let rec initial_priorities (str : string list) : ((pi * priority) list) =
 
 let rec valuate_stack (stack : partial_state list) (x : printable_term) : pi_i =
     match stack with
-    | [] -> raise (Failure ("value does not exist in stack"))
+    | [] -> raise (Failure ("printable term " ^ x ^ " does not exist in stack"))
     | t :: stack -> (
         try t x with
         | Failure _ -> valuate_stack stack x
@@ -345,6 +345,17 @@ let rec initial_beta (first : term_i) (second : term) :
     | TTerm Primitive, TTerm sigma -> (
         (None, fst, fun (PrimVal f, v, s) -> (let res = f (sigma, v) in let t_i = fst res in let value = snd res in (None, [], (s#alter_var "_reg_out" (TTerm t_i, value)))))
     )
+    (* Code Capture *)
+    | ATerm AltLbrace, PTerm "}" -> (ATerm Code, infty, fun (xi,_,s) -> (xi, [], s))
+    | ATerm AltLbrace, PTerm "{" -> raise (Failure "Cannot match { with {")
+    | ATerm AltLbrace, PTerm x -> (ATerm AltLbrace, infty, fun (CodeVal xi,_,s) -> (CodeVal (xi @ [x]), [], s))
+    | ATerm AltLbrace, ATerm Code -> (ATerm AltLbrace, infty, fun (CodeVal xi1, CodeVal xi2, s) -> (CodeVal (xi1 @ ["{"] @ xi2 @ ["}"]), [], s))
+    (* Parameter Capture *)
+    | ATerm AltLparen, PTerm ")" -> (ATerm Plist, fst, fun (l,_,s) -> (l,[],s))
+    | ATerm AltLparen, PTerm "(" -> raise (Failure "Cannot match ( with (")
+    | ATerm AltLparen, PTerm "," -> (ATerm AltLparen, fst, fun (l,_,s) -> (l, [], s))
+    | ATerm AltLparen, PTerm x -> (ATerm AltLparen, fst, fun (ListVal l,_,s) -> (ListVal (l @ [VarNameVal x]), [], s))
+    | ATerm AltLparen, ATerm Plist -> (ATerm AltLparen, fst, fun (ListVal l,u,s) -> (ListVal (l @ [u]), [], s))
 ;;
 
 type pi_priority = pi * priority;;
@@ -456,3 +467,4 @@ let initial_state (x : printable_term) : pi_i =
 
 let state = new state;;
 state#push initial_state;;
+
