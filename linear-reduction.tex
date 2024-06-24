@@ -320,6 +320,7 @@ For a state $\bar s=\bigl[(s_1,\dots,s_n),I=(i_1,\dots,i_k)\bigr]$, let us defin
     \item $\pop\bar s=\bigl[(s_1,\dots,s_{n-1}),I\bigr]$ if $i_k<n$ otherwise, $\bigl[(s_1,\dots,s_{n-1}),(i_1,\dots,i_{k-1})\bigr]$
     \item $\bar ss=\bigl[(s_1,\dots,s_ns),I\bigr]$
     \item $\bar s(\sigma)=s_1\cdots s_n(\sigma)$ for $\sigma\in\Sigma_P$
+    \item $\bar s_c=s_{i_k}\cdots s_n$
 \eenum
 Furthermore, if $\sigma\in\term_{\cal P}$ and $\varkappa\in\Pi_{\cal I}$ let us define $\bar s\{\sigma\mapsto\varkappa\}$ as $(s_1,\dots,s_i[\sigma\mapsto\varkappa],\dots,s_n)$ where $i$ is the maximum
 index such that $\sigma\in{\rm dom}s_i$.
@@ -379,7 +380,34 @@ By convention, {\astyle atomic abstract terms} will be red, {\tstyle type terms}
 
 \noindent{\bf Primitives}:
 \blist
-    \item $\primitive\ \isig \longto \epsilon\ \varnothing\ (f,v,s\to \epsilon,w,s')$ where $f(\isig,v)=(w,s')$ (the purpose is for $f$ to have a side effect
+    \item $\primitive\ \isig \longto \epsilon\ \varnothing\ (f,v,s\to \epsilon,w,s)$ where $f(\isig,v)=(w,s')$ (the purpose is for $f$ to have a side effect)
+\elist
+
+\noindent{\bf Code Capture}
+\blist
+    \item $\lbrace\a\ x\longto \lbrace\a\ \pinfty\ (\xi,\_,s\to\xi x,\epsilon,s)$ if $x\neq\{,\}$
+    \item $\lbrace\a\ x\longto \code\ \pinfty\ (\xi,\_,s\to\xi,\epsilon,s)$
+    \item $\lbrace\a\ \code\longto \lbrace\a\ \pinfty\ (\xi,\xi',s\to\xi\{\xi'\},\epsilon,s)$
+\elist
+
+\noindent{\bf Parameter Capture}
+\blist
+    \item $\lparen\a\ x \longto \lparen\a\ \fst\ (\ell,\_,s\to (\ell,x),\epsilon,s)$ for $x\neq(,)$
+    \item $\lparen\a\ ) \longto \plist\ \fst\ (\ell,\_,s\to \ell,\epsilon,s)$
+    \item $\lparen\a\ \plist \longto \lparen\a\ \fst\ (\ell,\ell',s\to (\ell,(\ell')),\epsilon,s)$
+\elist
+
+\noindent{\bf Function Definitions}
+\blist
+    \item $\fun\ x\longto \funname\ \pinfty\ (\_,\_,s\to(x,\epsilon), \epsilon, s + [\{\mapsto\lbrace\a,\}\mapsto\rbrace\a,(\mapsto\lparen\a,)\mapsto\rparen\a])$
+    \item $\funname\ \plist \longto \funvars\ \pinfty\ \bigl((x,\epsilon),u,s \to (x,u),\epsilon,s\bigr)$
+    \item $\funvars\ \code \longto \closure\ \fst\ \bigl((x,\ell),\xi,s\to C=\gen{\ell,\xi,s'[x\mapsto\closure(C)]},\epsilon,\pop s[x\mapsto\closure(C)]\bigr)$ where $s'=(\pop s)_c$.
+\elist
+
+\noindent{\bf Function Calls}
+\blist
+    \item $\closure\ \tsig \longto \epsilon\ \varnothing\ \bigl(\gen{\ell,\xi,s},u\mapsto\epsilon,\xi\},s+[\ell\mapsto u]\bigr)$ where $\ell\mapsto u$ means that if $\ell=(x)$ then $x\mapsto u$.
+        Otherwise $\ell=(x_1,\dots,x_n)$ and $u=(u_1,\dots,u_n)$ and $x_i\mapsto u_i$ (recursively).
 \elist
 
 \bye
