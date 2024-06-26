@@ -12,6 +12,7 @@ type value =
     | CodeVal of printable_term list
     | FunVal of printable_term * value
     | ClosureVal of closure
+    | IfVal of float * (printable_term list)
 
 and closure = {
     plist : value;
@@ -57,6 +58,9 @@ and abstract_term =
     | Funname
     | Funvars
     | Plist
+    | If
+    | IfBool
+    | IfThen
 
 and term =
     | None
@@ -115,6 +119,9 @@ let aterm_to_str (t : abstract_term) =
     | Funname -> "Funname"
     | Funvars -> "Funvars"
     | Plist -> "Plist"
+    | If -> "If"
+    | IfBool -> "IfBool"
+    | IfThen -> "IfThen"
 ;;
 
 let rec value_to_str v =
@@ -130,6 +137,7 @@ let rec value_to_str v =
     | CodeVal l -> List.fold_left (fun acc x -> acc ^ " " ^ x) "" l
     | FunVal (x, v) -> x ^ ", " ^ (value_to_str v)
     | ClosureVal c -> "<" ^ (value_to_str (c.plist)) ^ ", code, state>"
+    | IfVal (n,c) -> "<" ^ (Float.to_string n) ^ " code>"
 ;;
 
 class extnum (v : int) (isinf : bool) =
@@ -189,7 +197,7 @@ let rec valuate_stack (stack : partial_state list) (x : printable_term) : pi_i =
 class state =
     object(self)
         val mutable pstate_stack = ([] : partial_state list)
-        val mutable closure_stack = ([] : int list)
+        val mutable closure_stack = ([0] : int list)
         val mutable depth = 0
         method push pstate =
             pstate_stack <- pstate :: pstate_stack;
@@ -227,6 +235,19 @@ class state =
             self#alter pstate
         method valuate x =
             valuate_stack pstate_stack x
+        method close =
+            let i = (List.length closure_stack) - (List.hd closure_stack) in
+            let rec helper stack i y = (
+                if i < 0 then raise (Failure ("Variable " ^ y ^ " not in partial state"))
+                else (
+                    match stack with
+                    | [] -> raise (Failure ("Variable " ^ y ^ " not in partial state"))
+                    | ps :: stack -> (
+                        try ps y with
+                        | Failure _ -> helper stack (i-1) y
+                    )
+                )
+            ) in helper pstate_stack i
     end
 ;;
 
@@ -265,6 +286,25 @@ let let_new_state (state : state) (s : term_i) (x : printable_term) (v : value) 
         )
 ;;
 
+let tterm_val_to_pi_i ((tterm, u) : type_term * value) : pi_i =
+    (TTerm tterm, u)
+;;
+
+let rec create_pstate (plist : value) (u : value) (sigma : type_term) : partial_state =
+    let rec helper (plist : value) (u : value) (sigma : type_term) (y : printable_term) = (
+        match plist with
+        | VarNameVal x | ListVal [VarNameVal x] -> if x = y then (sigma, u) else raise (Failure ("Variable " ^ y ^ " not in partial state"))
+        | ListVal l -> (
+            match l,u,sigma with
+            | [],_,_ -> raise (Failure ("Cannot find variable " ^ y ^ " in partial state"))
+            | x :: l, ListVal (u1::u), Product (sigma1 :: sigma) -> (
+                try helper x u1 sigma1 y with
+                | Failure _ -> helper (ListVal l) (ListVal u) (Product sigma) y
+            )
+        )
+    ) in fun y -> ((helper plist u sigma y) |> tterm_val_to_pi_i)
+;;
+
 let term_i_to_term (t : term_i) : term =
     match t with
     | None -> None
@@ -287,6 +327,7 @@ let minfty = fun (n,m) -> new extnum (-1) true;;
 let rec initial_beta (first : term_i) (second : term) :
     (term_i * (extnum * extnum -> extnum) * (value * value * state -> value * (printable_term list) * state)) =
     match first, second with
+    (* End *)
     | sigma, ATerm End -> (sigma, minfty, fun (u,_,s) -> (u,[],s))
     (* Operators *)
     | TTerm sigma, ATerm (Op None) -> (ATerm (Op sigma), snd, fun (u,PreOpVal f,s) -> (OpVal(u,f),[],s))
@@ -356,6 +397,37 @@ let rec initial_beta (first : term_i) (second : term) :
     | ATerm AltLparen, PTerm "," -> (ATerm AltLparen, fst, fun (l,_,s) -> (l, [], s))
     | ATerm AltLparen, PTerm x -> (ATerm AltLparen, fst, fun (ListVal l,_,s) -> (ListVal (l @ [VarNameVal x]), [], s))
     | ATerm AltLparen, ATerm Plist -> (ATerm AltLparen, fst, fun (ListVal l,u,s) -> (ListVal (l @ [u]), [], s))
+    (* Function Definitions *)
+    | ATerm Fun, PTerm x -> (
+        let pstate y : pi_i = (match y with
+        | "{" -> (ATerm AltLbrace, CodeVal [])
+        | "(" -> (ATerm AltLparen, ListVal [])
+        | _ -> raise (Failure ("Pterm " ^ y ^ " not in partial state"))
+        ) in 
+        (ATerm Funname, infty, fun (_,_,s) -> (FunVal (x, None), [], s#push pstate))
+    )
+    | ATerm Funname, ATerm Plist -> (ATerm Funvars, infty, fun (FunVal (x, None), u, s) -> (FunVal (x,u), [], s))
+    | ATerm Funvars, ATerm Code -> (None, fst, fun (FunVal (x,u), CodeVal l, s) -> (
+        s#pop;
+        let clos = { plist = u; code = l; state = fun _ -> raise (Failure "You should not be seeing this");} in
+        s#alter_var x (TTerm Closure, ClosureVal clos);
+        clos.state <- s#close;
+        (ClosureVal clos, [], s)
+    ))
+    | TTerm Closure, TTerm sigma -> (None, fst, fun (ClosureVal clos, u, s) -> (
+        let pstate = create_pstate (clos.plist) u sigma in
+        (None, clos.code @ ["}"], (s#push_closure (clos.state))#alter pstate)
+    ))
+    (* Primitive If *)
+    | ATerm If, TTerm Num -> (
+        let pstate y : pi_i = (match y with
+        | "{" -> (ATerm AltLbrace, CodeVal [])
+        | "(" -> (ATerm AltLparen, ListVal [])
+        | _ -> raise (Failure ("Pterm " ^ y ^ " not in partial state"))
+        ) in (ATerm IfBool, fst, fun (_,NumVal n,s) -> (IfVal (n,[]), [], s#push pstate))
+    )
+    | ATerm IfBool, ATerm Code -> (ATerm IfThen, fst, fun (IfVal (n,[]), CodeVal l, s) -> (IfVal (n, l), [], s))
+    | ATerm IfThen, ATerm Code -> (None, fst, fun (IfVal (n,c1), CodeVal c2, s) -> (None, (if n = 0. then c2 else c1), s#pop))
 ;;
 
 type pi_priority = pi * priority;;
@@ -461,6 +533,7 @@ let initial_state (x : printable_term) : pi_i =
         | "{" -> (ATerm Lbrace, None)
         | "}" -> (ATerm Rbrace, None)
         | "fun" -> (ATerm Fun, None)
+        | "if" -> (ATerm If, None)
         | _ -> raise (Failure "Printable term not found in state")
     )
 ;;

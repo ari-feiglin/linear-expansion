@@ -2,7 +2,15 @@ open Lexer
 open Reducer
 
 let tokens = get_all_tokens ("
-(x,y,z,(a,bab,c))
+fun fib (n) {
+    if n {
+        if (n - 1) {
+            (fib (n-1) + fib (n-2))
+        }{1}
+    }{1}
+}
+let x = fib (3);
+_prim_print x;
 ");;
 
 (*let tokens = get_all_tokens "
