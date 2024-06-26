@@ -3,14 +3,14 @@ open Reducer
 
 let tokens = get_all_tokens ("
 fun fib (n) {
-    if n {
-        if (n - 1) {
-            (fib (n-1) + fib (n-2))
-        }{1}
-    }{1}
+    if
+    | n == 0 -> {1}
+    | n == 1 -> {1}
+    | 1 -> {fib(n-1) + fib(n-2)}
+    fi
 }
-let x = fib (3);
-_prim_print x;
+
+_prim_print fib(5);
 ");;
 
 (*let tokens = get_all_tokens "

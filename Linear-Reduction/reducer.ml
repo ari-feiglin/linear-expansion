@@ -12,7 +12,7 @@ type value =
     | CodeVal of printable_term list
     | FunVal of printable_term * value
     | ClosureVal of closure
-    | IfVal of float * (printable_term list)
+    | IfVal of (float * (printable_term list)) list
 
 and closure = {
     plist : value;
@@ -58,9 +58,13 @@ and abstract_term =
     | Funname
     | Funvars
     | Plist
+    | Bar
+    | Guard
+    | Arrow
+    | GuardArrow
+    | IfSegment
+    | Fi
     | If
-    | IfBool
-    | IfThen
 
 and term =
     | None
@@ -119,9 +123,13 @@ let aterm_to_str (t : abstract_term) =
     | Funname -> "Funname"
     | Funvars -> "Funvars"
     | Plist -> "Plist"
+    | Bar -> "Bar"
+    | Guard -> "Guard"
+    | Arrow -> "Arrow"
+    | GuardArrow -> "GuardArrow"
+    | IfSegment -> "IfSegment"
+    | Fi -> "Fi"
     | If -> "If"
-    | IfBool -> "IfBool"
-    | IfThen -> "IfThen"
 ;;
 
 let rec value_to_str v =
@@ -137,7 +145,7 @@ let rec value_to_str v =
     | CodeVal l -> List.fold_left (fun acc x -> acc ^ " " ^ x) "" l
     | FunVal (x, v) -> x ^ ", " ^ (value_to_str v)
     | ClosureVal c -> "<" ^ (value_to_str (c.plist)) ^ ", code, state>"
-    | IfVal (n,c) -> "<" ^ (Float.to_string n) ^ " code>"
+    | IfVal l -> List.fold_left (fun acc (n,c) -> acc ^ " <" ^ (Float.to_string n) ^ " code>>") "" l
 ;;
 
 class extnum (v : int) (isinf : bool) =
@@ -168,12 +176,20 @@ let initial_priority s =
         | "*" -> new extnum 2 false
         | "-" -> new extnum 1 false
         | "/" -> new extnum 2 false
+        | "==" -> new extnum 0 false
+        | "!=" -> new extnum 0 false
+        | "<=" -> new extnum 0 false
+        | ">=" -> new extnum 0 false
+        | ">" -> new extnum 0 false
+        | "<" -> new extnum 0 false
         | "[" -> new extnum 0 false
         | "]" -> new extnum 0 false
         | "." -> new extnum 0 true
         | "," -> new extnum 0 false
         | "{" -> new extnum 0 true
         | "}" -> new extnum 0 true
+        | "|" ->  new extnum 0 false
+        | "->" ->  new extnum 0 true
         | "_prim_print" -> new extnum (-1) true
         | _ -> new extnum 0 true
     )
@@ -286,6 +302,13 @@ let let_new_state (state : state) (s : term_i) (x : printable_term) (v : value) 
         )
 ;;
 
+let rec find_guard (l : (float * printable_term list) list) : printable_term list =
+    match l with
+    | [] -> []
+    | (0.0,xi) :: l -> find_guard l
+    | (n,xi) :: l -> xi
+;;
+
 let tterm_val_to_pi_i ((tterm, u) : type_term * value) : pi_i =
     (TTerm tterm, u)
 ;;
@@ -323,6 +346,12 @@ let term_to_term_i (t : term) : term_i =
 let zero = fun (n,m) -> new extnum 0 false;;
 let infty = fun (n,m) -> new extnum 0 true;;
 let minfty = fun (n,m) -> new extnum (-1) true;;
+
+let alt_pstate y : pi_i = match y with
+    | "{" -> (ATerm AltLbrace, CodeVal [])
+    | "(" -> (ATerm AltLparen, ListVal [])
+    | _ -> raise (Failure ("Pterm " ^ y ^ " not in partial state"))
+;;
 
 let rec initial_beta (first : term_i) (second : term) :
     (term_i * (extnum * extnum -> extnum) * (value * value * state -> value * (printable_term list) * state)) =
@@ -398,14 +427,7 @@ let rec initial_beta (first : term_i) (second : term) :
     | ATerm AltLparen, PTerm x -> (ATerm AltLparen, fst, fun (ListVal l,_,s) -> (ListVal (l @ [VarNameVal x]), [], s))
     | ATerm AltLparen, ATerm Plist -> (ATerm AltLparen, fst, fun (ListVal l,u,s) -> (ListVal (l @ [u]), [], s))
     (* Function Definitions *)
-    | ATerm Fun, PTerm x -> (
-        let pstate y : pi_i = (match y with
-        | "{" -> (ATerm AltLbrace, CodeVal [])
-        | "(" -> (ATerm AltLparen, ListVal [])
-        | _ -> raise (Failure ("Pterm " ^ y ^ " not in partial state"))
-        ) in 
-        (ATerm Funname, infty, fun (_,_,s) -> (FunVal (x, None), [], s#push pstate))
-    )
+    | ATerm Fun, PTerm x -> (ATerm Funname, infty, fun (_,_,s) -> (FunVal (x, None), [], s#push alt_pstate))
     | ATerm Funname, ATerm Plist -> (ATerm Funvars, infty, fun (FunVal (x, None), u, s) -> (FunVal (x,u), [], s))
     | ATerm Funvars, ATerm Code -> (None, fst, fun (FunVal (x,u), CodeVal l, s) -> (
         s#pop;
@@ -416,10 +438,10 @@ let rec initial_beta (first : term_i) (second : term) :
     ))
     | TTerm Closure, TTerm sigma -> (None, fst, fun (ClosureVal clos, u, s) -> (
         let pstate = create_pstate (clos.plist) u sigma in
-        (None, clos.code @ ["}"], (s#push_closure (clos.state))#alter pstate)
+        (None, ["("] @ clos.code @ [")"; "}"], (s#push_closure (clos.state))#alter pstate)
     ))
     (* Primitive If *)
-    | ATerm If, TTerm Num -> (
+    (*| ATerm If, TTerm Num -> (
         let pstate y : pi_i = (match y with
         | "{" -> (ATerm AltLbrace, CodeVal [])
         | "(" -> (ATerm AltLparen, ListVal [])
@@ -427,7 +449,14 @@ let rec initial_beta (first : term_i) (second : term) :
         ) in (ATerm IfBool, fst, fun (_,NumVal n,s) -> (IfVal (n,[]), [], s#push pstate))
     )
     | ATerm IfBool, ATerm Code -> (ATerm IfThen, fst, fun (IfVal (n,[]), CodeVal l, s) -> (IfVal (n, l), [], s))
-    | ATerm IfThen, ATerm Code -> (None, fst, fun (IfVal (n,c1), CodeVal c2, s) -> (None, (if n = 0. then c2 else c1), s#pop))
+    | ATerm IfThen, ATerm Code -> (None, fst, fun (IfVal (n,c1), CodeVal c2, s) -> (None, (if n = 0. then c2 else c1), s#pop))*)
+    (* If *)
+    | TTerm Num, ATerm Arrow -> (TTerm Num, zero, fun (u,_,s) -> (u,[],s#push alt_pstate))
+    | ATerm Bar, TTerm Num -> (ATerm Guard, infty, fun (_,NumVal n,s) -> (IfVal [(n,[])], [], s))
+    | ATerm Guard, ATerm Code -> (ATerm IfSegment, infty, fun (IfVal [(n,[])], CodeVal xi, s) -> (IfVal [(n,xi)], [], s#pop))
+    | ATerm IfSegment, ATerm IfSegment -> (ATerm IfSegment, infty, fun (IfVal l1, IfVal l2, s) -> (IfVal (l1 @ l2), [], s))
+    | ATerm IfSegment, ATerm Fi -> (ATerm Fi, infty, fun (u, _, s) -> (u, [], s))
+    | ATerm If, ATerm Fi -> (None, infty, fun (_, IfVal l, s) -> (None, find_guard l, s))
 ;;
 
 type pi_priority = pi * priority;;
@@ -511,6 +540,9 @@ let rec total_beta (silent : bool) (str : pi_priority list) (state : state) =
     let state = snd res in
     if str != [] then
         total_beta silent str state
+;;
+
+let bool_to_num b = if b then 1. else 0.;;
 
 let initial_state (x : printable_term) : pi_i =
     try (TTerm Num, NumVal(Float.of_string x))
@@ -523,9 +555,17 @@ let initial_state (x : printable_term) : pi_i =
         | "*" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n*.m)))
         | "-" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n-.m)))
         | "/" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n/.m)))
+        | "==" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n = m |> bool_to_num)))
+        | "!=" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n <> m |> bool_to_num)))
+        | "<=" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n <= m |> bool_to_num)))
+        | ">=" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n >= m |> bool_to_num)))
+        | "<" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n < m |> bool_to_num)))
+        | ">" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n > m |> bool_to_num)))
         | "[" -> (ATerm (Lbrack None), None)
         | "]" -> (ATerm Rbrack, None)
         | "." -> (ATerm Period, None)
+        | "|" -> (ATerm Bar, None)
+        | "->" -> (ATerm Arrow, None)
         | "let" -> (ATerm Let, None)
         | "=" -> (ATerm Equal, None)
         | "_prim_print" -> (TTerm Primitive, PrimVal (fun (a,v) -> (print_endline (value_to_str v); (None, None))))
@@ -534,6 +574,7 @@ let initial_state (x : printable_term) : pi_i =
         | "}" -> (ATerm Rbrace, None)
         | "fun" -> (ATerm Fun, None)
         | "if" -> (ATerm If, None)
+        | "fi" -> (ATerm Fi, IfVal [])
         | _ -> raise (Failure "Printable term not found in state")
     )
 ;;
