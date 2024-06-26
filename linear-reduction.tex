@@ -406,8 +406,9 @@ By convention, {\astyle atomic abstract terms} will be red, {\tstyle type terms}
 
 \noindent{\bf Function Calls}
 \blist
-    \item $\closure\ \tsig \longto \epsilon\ \varnothing\ \bigl(\gen{\ell,\xi,s},u\mapsto\epsilon,\xi\},s+[\ell\mapsto u]\bigr)$ where $\ell\mapsto u$ means that if $\ell=(x)$ then $x\mapsto u$.
-        Otherwise $\ell=(x_1,\dots,x_n)$ and $u=(u_1,\dots,u_n)$ and $x_i\mapsto u_i$ (recursively).
+    \item $\closure\ \tsig \longto \epsilon\ \varnothing\ \bigl(\gen{\ell,\xi,{\it ps}},u,s\mapsto\epsilon,\xi\},s+_c{\it ps}[\ell\mapsto\tsig(u)]\bigr)$ where $\ell\mapsto\tsig(u)$ means that if
+        $\ell=(x)$ then $x\mapsto \tsig(u)$.
+        Otherwise $\ell=(x_1,\dots,x_n)$, $\tsig=\product\tsig_1\cdots\tsig_n$, and $u=(u_1,\dots,u_n)$ and $x_i\mapsto\tsig_i(u_i)$ (recursively).
 \elist
 
 \bye
