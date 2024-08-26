@@ -62,8 +62,9 @@ and abstract_term =
     | Guard
     | Arrow
     | GuardArrow
-    | IfSegment
-    | Fi
+    | SwitchSegment
+    | ConstEnd
+    | Switch
     | If
 
 and term =
@@ -127,8 +128,9 @@ let aterm_to_str (t : abstract_term) =
     | Guard -> "Guard"
     | Arrow -> "Arrow"
     | GuardArrow -> "GuardArrow"
-    | IfSegment -> "IfSegment"
-    | Fi -> "Fi"
+    | SwitchSegment -> "SwitchSegment"
+    | ConstEnd -> "ConstEnd"
+    | Switch -> "Switch"
     | If -> "If"
 ;;
 
@@ -441,7 +443,7 @@ let rec initial_beta (first : term_i) (second : term) :
         (None, ["("] @ clos.code @ [")"; "}"], (s#push_closure (clos.state))#alter pstate)
     ))
     (* Primitive If *)
-    (*| ATerm If, TTerm Num -> (
+    | ATerm If, TTerm Num -> (
         let pstate y : pi_i = (match y with
         | "{" -> (ATerm AltLbrace, CodeVal [])
         | "(" -> (ATerm AltLparen, ListVal [])
@@ -449,14 +451,14 @@ let rec initial_beta (first : term_i) (second : term) :
         ) in (ATerm IfBool, fst, fun (_,NumVal n,s) -> (IfVal (n,[]), [], s#push pstate))
     )
     | ATerm IfBool, ATerm Code -> (ATerm IfThen, fst, fun (IfVal (n,[]), CodeVal l, s) -> (IfVal (n, l), [], s))
-    | ATerm IfThen, ATerm Code -> (None, fst, fun (IfVal (n,c1), CodeVal c2, s) -> (None, (if n = 0. then c2 else c1), s#pop))*)
+    | ATerm IfThen, ATerm Code -> (None, fst, fun (IfVal (n,c1), CodeVal c2, s) -> (None, (if n = 0. then c2 else c1), s#pop))
     (* If *)
     | TTerm Num, ATerm Arrow -> (TTerm Num, zero, fun (u,_,s) -> (u,[],s#push alt_pstate))
     | ATerm Bar, TTerm Num -> (ATerm Guard, infty, fun (_,NumVal n,s) -> (IfVal [(n,[])], [], s))
-    | ATerm Guard, ATerm Code -> (ATerm IfSegment, infty, fun (IfVal [(n,[])], CodeVal xi, s) -> (IfVal [(n,xi)], [], s#pop))
-    | ATerm IfSegment, ATerm IfSegment -> (ATerm IfSegment, infty, fun (IfVal l1, IfVal l2, s) -> (IfVal (l1 @ l2), [], s))
-    | ATerm IfSegment, ATerm Fi -> (ATerm Fi, infty, fun (u, _, s) -> (u, [], s))
-    | ATerm If, ATerm Fi -> (None, infty, fun (_, IfVal l, s) -> (None, find_guard l, s))
+    | ATerm Guard, ATerm Code -> (ATerm SwitchSegment, infty, fun (IfVal [(n,[])], CodeVal xi, s) -> (IfVal [(n,xi)], [], s#pop))
+    | ATerm SwitchSegment, ATerm SwitchSegment -> (ATerm SwitchSegment, infty, fun (IfVal l1, IfVal l2, s) -> (IfVal (l1 @ l2), [], s))
+    | ATerm SwitchSegment, ATerm ConstEnd -> (ATerm ConstEnd, infty, fun (u, _, s) -> (u, [], s))
+    | ATerm Switch, ATerm ConstEnd -> (None, infty, fun (_, IfVal l, s) -> (None, find_guard l, s))
 ;;
 
 type pi_priority = pi * priority;;
@@ -574,7 +576,8 @@ let initial_state (x : printable_term) : pi_i =
         | "}" -> (ATerm Rbrace, None)
         | "fun" -> (ATerm Fun, None)
         | "if" -> (ATerm If, None)
-        | "fi" -> (ATerm Fi, IfVal [])
+        | "switch" -> (ATerm Switch, None)
+        | "end" -> (ATerm ConstEnd, IfVal [])
         | _ -> raise (Failure "Printable term not found in state")
     )
 ;;
