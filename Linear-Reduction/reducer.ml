@@ -1,3 +1,7 @@
+type parameters = { mutable silent : bool; mutable recursion_depth : int; }
+
+let parameters : parameters = { silent = false; recursion_depth = 0; }
+
 type printable_term = string;;
 
 type value =
@@ -12,7 +16,8 @@ type value =
     | CodeVal of printable_term list
     | FunVal of printable_term * value
     | ClosureVal of closure
-    | IfVal of (float * (printable_term list)) list
+    | IfVal of float * (printable_term list)
+    | SwitchVal of (float * (printable_term list)) list
 
 and closure = {
     plist : value;
@@ -66,6 +71,9 @@ and abstract_term =
     | ConstEnd
     | Switch
     | If
+    | IfBool
+    | IfVar
+    | IfThen
 
 and term =
     | None
@@ -132,6 +140,20 @@ let aterm_to_str (t : abstract_term) =
     | ConstEnd -> "ConstEnd"
     | Switch -> "Switch"
     | If -> "If"
+    | IfBool -> "IfBool"
+    | IfVar -> "IfVar"
+    | IfThen -> "IfThen"
+;;
+
+let rec _list_to_str f l =
+    match l with
+    | [] -> "]"
+    | [x] -> (f x) ^ "]"
+    | t :: l -> (f t) ^ ", " ^ (_list_to_str f l)
+;;
+
+let list_to_str f l =
+    "[" ^ (_list_to_str f l)
 ;;
 
 let rec value_to_str v =
@@ -140,14 +162,15 @@ let rec value_to_str v =
     | NumVal(f) -> Float.to_string f
     | PreOpVal(f) -> "fun"
     | OpVal(v,f) -> (value_to_str v) ^ " fun"
-    | ListVal(l) -> (List.fold_left (fun acc x -> acc ^ (value_to_str x) ^ ", ") "[" l) ^ "]"
+    | ListVal(l) -> list_to_str value_to_str l
     | LetVal (v,l) -> v ^ (List.fold_left (fun acc x -> acc ^ " " ^ (string_of_int x)) "" l)
     | PrimVal _ -> "prim"
     | VarNameVal s -> s
     | CodeVal l -> List.fold_left (fun acc x -> acc ^ " " ^ x) "" l
     | FunVal (x, v) -> x ^ ", " ^ (value_to_str v)
     | ClosureVal c -> "<" ^ (value_to_str (c.plist)) ^ ", code, state>"
-    | IfVal l -> List.fold_left (fun acc (n,c) -> acc ^ " <" ^ (Float.to_string n) ^ " code>>") "" l
+    | IfVal (n,l) -> "<" ^ (Float.to_string n) ^ " code>"
+    | SwitchVal l -> List.fold_left (fun acc (n,c) -> acc ^ " <" ^ (Float.to_string n) ^ " code>>") "" l
 ;;
 
 class extnum (v : int) (isinf : bool) =
@@ -178,6 +201,7 @@ let initial_priority s =
         | "*" -> new extnum 2 false
         | "-" -> new extnum 1 false
         | "/" -> new extnum 2 false
+        | "@" -> new extnum 1 false
         | "==" -> new extnum 0 false
         | "!=" -> new extnum 0 false
         | "<=" -> new extnum 0 false
@@ -192,7 +216,7 @@ let initial_priority s =
         | "}" -> new extnum 0 true
         | "|" ->  new extnum 0 false
         | "->" ->  new extnum 0 true
-        | "_prim_print" -> new extnum (-1) true
+        (* | "_prim_print" -> new extnum (-1) true *)
         | _ -> new extnum 0 true
     )
 ;;
@@ -288,7 +312,7 @@ let rec swap_list (l : value) (ns : int list) (x : value) =
 ;;
 
 let let_new_state (state : state) (s : term_i) (x : printable_term) (v : value) (ns : int list) : partial_state =
-    if s = None then raise (Failure "Cannot put None value in state")
+    if s = None then raise (Invalid_argument "Cannot put None value in state")
     else if ns = [] then
         fun y -> (
             if y = x then (s, v)
@@ -322,6 +346,10 @@ let rec create_pstate (plist : value) (u : value) (sigma : type_term) : partial_
         | ListVal l -> (
             match l,u,sigma with
             | [],_,_ -> raise (Failure ("Cannot find variable " ^ y ^ " in partial state"))
+            | [x; z], ListVal ([u1;u2]), Product([sigma1; sigma2]) -> (
+                try helper x u1 sigma1 y with
+                | Failure _ -> helper z u2 sigma2 y
+            )
             | x :: l, ListVal (u1::u), Product (sigma1 :: sigma) -> (
                 try helper x u1 sigma1 y with
                 | Failure _ -> helper (ListVal l) (ListVal u) (Product sigma) y
@@ -398,7 +426,7 @@ let rec initial_beta (first : term_i) (second : term) :
     | ATerm Let, PTerm x -> (ATerm Letvar, snd, fun (_,_,s) -> (LetVal (x,[]), [], s))
     | ATerm Letvar, ATerm Index -> (ATerm Letvar, fst, fun (LetVal (x,l), NumVal n, s) -> (LetVal (x, l@[int_of_float n]), [], s))
     | ATerm Letvar, ATerm Equal -> (ATerm Leteq, minfty, fun (u,_,s) -> (u, [], s))
-    | ATerm Leteq, sigma -> (None, fst, fun (LetVal (x,l), u, s) -> None, [], s#alter (let_new_state s (term_to_term_i sigma) x u l))
+    | ATerm Leteq, TTerm sigma -> (None, fst, fun (LetVal (x,l), u, s) -> None, [], s#alter (let_new_state s (TTerm sigma) x u l))
     (* Scoping *)
     | ATerm Lbrace, None -> (None, fst, fun (_,_,s) -> (None, [], s#push (fun x -> raise (Failure "Empty state"))))
     | ATerm Rbrace, None -> (None, fst, fun (_,_,s) -> (None, [], s#pop))
@@ -440,7 +468,7 @@ let rec initial_beta (first : term_i) (second : term) :
     ))
     | TTerm Closure, TTerm sigma -> (None, fst, fun (ClosureVal clos, u, s) -> (
         let pstate = create_pstate (clos.plist) u sigma in
-        (None, ["("] @ clos.code @ [")"; "}"], (s#push_closure (clos.state))#alter pstate)
+        (None, clos.code @ ["}"], (s#push_closure (clos.state))#alter pstate)
     ))
     (* Primitive If *)
     | ATerm If, TTerm Num -> (
@@ -454,20 +482,29 @@ let rec initial_beta (first : term_i) (second : term) :
     | ATerm IfThen, ATerm Code -> (None, fst, fun (IfVal (n,c1), CodeVal c2, s) -> (None, (if n = 0. then c2 else c1), s#pop))
     (* If *)
     | TTerm Num, ATerm Arrow -> (TTerm Num, zero, fun (u,_,s) -> (u,[],s#push alt_pstate))
-    | ATerm Bar, TTerm Num -> (ATerm Guard, infty, fun (_,NumVal n,s) -> (IfVal [(n,[])], [], s))
-    | ATerm Guard, ATerm Code -> (ATerm SwitchSegment, infty, fun (IfVal [(n,[])], CodeVal xi, s) -> (IfVal [(n,xi)], [], s#pop))
-    | ATerm SwitchSegment, ATerm SwitchSegment -> (ATerm SwitchSegment, infty, fun (IfVal l1, IfVal l2, s) -> (IfVal (l1 @ l2), [], s))
+    | ATerm Bar, TTerm Num -> (ATerm Guard, infty, fun (_,NumVal n,s) -> (SwitchVal [(n,[])], [], s))
+    | ATerm Guard, ATerm Code -> (ATerm SwitchSegment, infty, fun (SwitchVal [(n,[])], CodeVal xi, s) -> (SwitchVal [(n,xi)], [], s#pop))
+    | ATerm SwitchSegment, ATerm SwitchSegment -> (ATerm SwitchSegment, infty, fun (SwitchVal l1, SwitchVal l2, s) -> (SwitchVal (l1 @ l2), [], s))
     | ATerm SwitchSegment, ATerm ConstEnd -> (ATerm ConstEnd, infty, fun (u, _, s) -> (u, [], s))
-    | ATerm Switch, ATerm ConstEnd -> (None, infty, fun (_, IfVal l, s) -> (None, find_guard l, s))
+    | ATerm Switch, ATerm ConstEnd -> (None, infty, fun (_, SwitchVal l, s) -> (None, find_guard l, s))
 ;;
 
 type pi_priority = pi * priority;;
+
+let rec copy_str s n =
+    if n > 0 then
+        s ^ (copy_str s (n-1))
+    else
+        ""
+;;
 
 let first3 (x,y,z) = x;;
 let second3 (x,y,z) = y;;
 let third3 (x,y,z) = z;;
 
-let try_initial (first : term_i) (first_val : value) (first_priority : priority) (second : term) (second_val : value) (second_priority : priority) (tokens : pi_priority list) (state : state) =
+exception Cant_match
+
+let rec try_initial (first : term_i) (first_val : value) (first_priority : priority) (second : term) (second_val : value) (second_priority : priority) (tokens : pi_priority list) (state : state) =
     let ib = initial_beta first second in
     let new_term = first3 ib in
     let priority_function = second3 ib in
@@ -477,13 +514,26 @@ let try_initial (first : term_i) (first_val : value) (first_priority : priority)
     let new_value = first3 new_values in
     let printable_string = second3 new_values in
     let new_state = third3 new_values in
-    if new_term = None then
-        (initial_priorities printable_string @ tokens, new_state)
-    else
-        (((Pi_I (new_term, new_value), new_priority) :: (initial_priorities printable_string)) @ tokens, new_state)
-;;
+    let tb = (
+        if printable_string <> [] then (
+            parameters.recursion_depth <- parameters.recursion_depth + 1;
+            let res = total_beta (initial_priorities printable_string) new_state in
+            parameters.recursion_depth <- parameters.recursion_depth - 1;
+            res
+        )
+        else
+            ([], new_state)
+    ) in
+    let new_tokens = fst tb in
+    let new_state = snd tb in
+    if new_term = None then (
+        (new_tokens @ tokens, new_state)
+    )
+    else (
+        (new_tokens @ [((Pi_I (new_term, new_value), new_priority))] @ tokens, new_state)
+    )
 
-let rec derived_beta (tokens, state : pi_priority list * state) : (pi_priority list * state) =
+and derived_beta (tokens, state : pi_priority list * state) : (pi_priority list * state) =
     match tokens with
     | [] -> [], state
     | (PTerm x, n) :: tokens -> ((Pi_I (state#valuate x), n) :: tokens, state)
@@ -491,7 +541,7 @@ let rec derived_beta (tokens, state : pi_priority list * state) : (pi_priority l
         try try_initial t u n None None n toks state with
         | Match_failure _ | Failure _ -> (
             match toks with
-            | [] -> raise (Failure "Can't match internal term with nothing")
+            | [] -> raise Cant_match
             | (Pi_I (s,v), m) :: toksA -> (
                 if n#geq m then
                     try try_initial t u n (term_i_to_term s) v m toksA state with
@@ -524,24 +574,25 @@ let rec derived_beta (tokens, state : pi_priority list * state) : (pi_priority l
             )
         )
     )
-;;
 
-let rec print_tokens (str,state : pi_priority list * state) =
+and print_tokens (str,state : pi_priority list * state) =
     match str with
     | [] -> print_endline ""
     | (PTerm t, n) :: str -> print_string (t ^ "_" ^ (n#str) ^ " "); print_tokens (str, state)
     | (Pi_I (TTerm t, v), n) :: str -> print_string ((tterm_to_str t) ^ "_" ^ (n#str) ^ "(" ^ (value_to_str v) ^ ") "); print_tokens (str,state)
     | (Pi_I (ATerm t, v), n) :: str -> print_string ((aterm_to_str t) ^ "_" ^ (n#str) ^ "(" ^ (value_to_str v) ^ ") "); print_tokens (str,state)
     | (Pi_I (None, v), n) :: str -> print_string "None "; print_tokens (str, state)
-;;
 
-let rec total_beta (silent : bool) (str : pi_priority list) (state : state) =
-    if not silent then print_tokens (str, state);
+and total_beta (str : pi_priority list) (state : state) =
+    (if not parameters.silent then (print_string (copy_str "\t" (parameters.recursion_depth)); print_tokens (str, state)));
     let res = derived_beta (str, state) in
     let str = fst res in
     let state = snd res in
-    if str != [] then
-        total_beta silent str state
+    if str != [] then (
+        try total_beta str state with
+        | Cant_match -> (str, state)
+    ) else
+        (str, state)
 ;;
 
 let bool_to_num b = if b then 1. else 0.;;
@@ -557,6 +608,7 @@ let initial_state (x : printable_term) : pi_i =
         | "*" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n*.m)))
         | "-" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n-.m)))
         | "/" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n/.m)))
+        | "@" -> (ATerm (Op None), PreOpVal (fun (ListVal l1, ListVal l2) -> ListVal (l1 @ l2)))
         | "==" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n = m |> bool_to_num)))
         | "!=" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n <> m |> bool_to_num)))
         | "<=" -> (ATerm (Op None), PreOpVal (fun (NumVal n, NumVal m) -> NumVal(n <= m |> bool_to_num)))
@@ -571,13 +623,15 @@ let initial_state (x : printable_term) : pi_i =
         | "let" -> (ATerm Let, None)
         | "=" -> (ATerm Equal, None)
         | "_prim_print" -> (TTerm Primitive, PrimVal (fun (a,v) -> (print_endline (value_to_str v); (None, None))))
+        | "_prim_len" -> (TTerm Primitive, PrimVal (fun (a,ListVal l) ->  (Num, NumVal (l |> List.length |> float_of_int))))
+        | "_prim_tail" -> (TTerm Primitive, PrimVal (fun (sigma,ListVal (h :: t)) ->  (sigma, ListVal t)))
         | "," -> (ATerm (Comma []), None)
         | "{" -> (ATerm Lbrace, None)
         | "}" -> (ATerm Rbrace, None)
         | "fun" -> (ATerm Fun, None)
         | "if" -> (ATerm If, None)
         | "switch" -> (ATerm Switch, None)
-        | "end" -> (ATerm ConstEnd, IfVal [])
+        | "end" -> (ATerm ConstEnd, SwitchVal [])
         | _ -> raise (Failure "Printable term not found in state")
     )
 ;;

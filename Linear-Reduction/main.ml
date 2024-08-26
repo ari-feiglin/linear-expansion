@@ -1,25 +1,34 @@
 open Lexer
 open Reducer
 
-let tokens = get_all_tokens ("
-fun fib (n) {
-    if
-    | n == 0 -> {1}
-    | n == 1 -> {1}
-    | 1 -> {fib(n-1) + fib(n-2)}
-    fi
-}
+let rec read_chan chan =
+    try (
+        let curr_line = (input_line chan) ^ "\n" in
+        let rest = read_chan chan in
+        curr_line ^ rest
+    ) with
+    | End_of_file -> (
+        close_in chan;
+        ""
+    )
+;;
 
-_prim_print fib(5);
-");;
+let read_file filename =
+    let chan = open_in filename in
+    read_chan chan
+;;
 
-(*let tokens = get_all_tokens "
-    let x = 1;;
-";;*)
+let () =
+    if Array.length Sys.argv < 2 then (
+        print_endline "Must supply filename";
+        exit 1;
+    );
 
-if Array.length Sys.argv > 1 && Sys.argv.(1) = "y" then
-    total_beta true (initial_priorities tokens) state
-else
-    total_beta false (initial_priorities tokens) state
+    if Array.length Sys.argv > 2 && Sys.argv.(2) = "y" then
+        parameters.silent <- true;
+
+    let tokens = Sys.argv.(1) |> read_file |> get_all_tokens in
+    total_beta (initial_priorities tokens) state;
+    ()
 ;;
 
